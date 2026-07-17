@@ -25,13 +25,11 @@ date
 
 
 
-
-const lastAppointment =
-await Appointment.findOne({
+const lastAppointment = await Appointment.findOne({
 
 doctor,
 
-date,
+date
 
 })
 
@@ -44,8 +42,6 @@ token:-1
 
 
 
-
-
 const token = lastAppointment
 
 ? lastAppointment.token + 1
@@ -54,10 +50,7 @@ const token = lastAppointment
 
 
 
-
-
 const queuePosition = token;
-
 
 
 
@@ -69,8 +62,7 @@ const queuePosition = token;
 
 const today = new Date();
 
-const appointmentDate =
-new Date(date);
+const appointmentDate = new Date(date);
 
 
 
@@ -82,14 +74,12 @@ today.setHours(
 );
 
 
-
 appointmentDate.setHours(
 0,
 0,
 0,
 0
 );
-
 
 
 
@@ -104,8 +94,6 @@ let queueStatus = "Scheduled";
 
 
 
-
-
 if(
 appointmentDate.getTime()
 ===
@@ -113,17 +101,15 @@ today.getTime()
 ){
 
 
-
 waitingTime =
-(queuePosition - 1) * 10;
 
+(queuePosition - 1) * 10;
 
 
 queueStarted = true;
 
 
-queueStatus =
-"Running";
+queueStatus = "Running";
 
 
 }
@@ -137,8 +123,7 @@ waitingTime = null;
 queueStarted = false;
 
 
-queueStatus =
-"Scheduled";
+queueStatus = "Scheduled";
 
 
 }
@@ -148,38 +133,25 @@ queueStatus =
 
 
 
-
-const appointment =
-new Appointment({
-
+const appointment = new Appointment({
 
 patient,
 
-
 doctor,
-
 
 date,
 
-
 token,
-
 
 queuePosition,
 
-
 waitingTime,
-
 
 queueStarted,
 
-
 queueStatus
 
-
 });
-
-
 
 
 
@@ -191,45 +163,22 @@ await appointment.save();
 
 
 
-
-
-const io =
-req.app.get("io");
+const io = req.app.get("io");
 
 
 
+console.log("✅ Appointment Booked");
 
+console.log("Patient:",patient);
 
-console.log(
-"✅ Appointment Booked"
-);
+console.log("Doctor:",doctor);
 
-
-console.log(
-"Patient:",
-patient
-);
-
-
-console.log(
-"Doctor:",
-doctor
-);
-
-
-console.log(
-"Token:",
-token
-);
-
-
-
+console.log("Token:",token);
 
 
 
 
 if(io){
-
 
 io.emit(
 
@@ -239,10 +188,7 @@ appointment
 
 );
 
-
 }
-
-
 
 
 
@@ -250,34 +196,24 @@ appointment
 
 res.status(201).json({
 
-
 message:
 "Appointment Booked Successfully",
 
-
 appointment,
-
 
 queuePosition,
 
-
 waitingTime,
-
 
 queueStarted,
 
-
 queueStatus
 
-
 });
 
 
 
-
-
 }
-
 
 
 catch(err){
@@ -286,17 +222,14 @@ catch(err){
 console.log(err);
 
 
-
 res.status(500).json({
 
-message:
-err.message
+message:err.message
 
 });
 
 
 }
-
 
 
 };
@@ -310,9 +243,7 @@ const getAppointments = async(req,res)=>{
 try{
 
 
-const appointments =
-
-await Appointment.find()
+const appointments = await Appointment.find()
 
 
 .populate(
@@ -336,10 +267,7 @@ token:1
 
 
 
-
-res.json(
-appointments
-);
+res.json(appointments);
 
 
 
@@ -372,6 +300,8 @@ message:err.message
 
 
 
+
+
 // ======================
 // Get Patient Appointments
 // ======================
@@ -383,9 +313,7 @@ const getPatientAppointments = async(req,res)=>{
 try{
 
 
-const appointments =
-
-await Appointment.find({
+const appointments = await Appointment.find({
 
 
 patient:req.params.id
@@ -420,13 +348,18 @@ token:1
 const today = new Date();
 
 
-
 today.setHours(
+
 0,
+
 0,
+
 0,
+
 0
+
 );
+
 
 
 
@@ -439,23 +372,18 @@ const updatedAppointments = appointments.map(
 (appointment)=>{
 
 
-
 const appointmentObj =
-
 appointment.toObject();
 
 
 
 
-
 const appointmentDate =
-
 new Date(
 
 appointment.date
 
 );
-
 
 
 
@@ -477,7 +405,6 @@ appointmentDate.setHours(
 
 
 
-
 // ======================
 // Future Appointment
 // ======================
@@ -488,24 +415,21 @@ appointmentDate > today
 ){
 
 
-
 appointmentObj.queueStarted = false;
-
 
 
 appointmentObj.queueStatus =
 "Scheduled";
 
 
-
 appointmentObj.waitingTime = null;
 
 
+appointmentObj.patientsAhead = null;
+
 
 appointmentObj.estimatedMessage =
-
 "Available on appointment day";
-
 
 
 }
@@ -536,24 +460,16 @@ today.getTime()
 appointmentObj.queueStarted = true;
 
 
-
 appointmentObj.queueStatus =
-
 "Running";
 
 
 
 
 
-// Calculate live waiting time
-
-
 if(
-
 appointmentObj.status === "Waiting"
-
 ){
-
 
 
 const patientsAhead =
@@ -562,13 +478,18 @@ appointments.filter(
 
 (item)=>
 
+
 item.doctor === appointment.doctor &&
+
 
 item.date === appointment.date &&
 
+
 item.status === "Waiting" &&
 
+
 item.token < appointment.token
+
 
 ).length;
 
@@ -576,28 +497,29 @@ item.token < appointment.token
 
 
 
-appointmentObj.waitingTime =
-
-patientsAhead * 10;
-
-
-
 appointmentObj.patientsAhead =
-
 patientsAhead;
 
+
+appointmentObj.waitingTime =
+patientsAhead * 10;
 
 
 }
 
 
 
-
-
 appointmentObj.estimatedMessage =
 
-`${appointmentObj.waitingTime || 0} minutes`;
+appointmentObj.waitingTime
 
+?
+
+`${appointmentObj.waitingTime} minutes`
+
+:
+
+"Your turn is next";
 
 
 
@@ -621,26 +543,18 @@ else{
 appointmentObj.queueStarted = false;
 
 
-
 appointmentObj.queueStatus =
-
 "Completed";
-
 
 
 appointmentObj.waitingTime = null;
 
 
-
 appointmentObj.estimatedMessage =
-
 "Completed";
 
 
-
 }
-
-
 
 
 
@@ -658,405 +572,11 @@ return appointmentObj;
 
 
 
-res.json(
-
-updatedAppointments
-
-);
+res.json(updatedAppointments);
 
 
 
 }
-
-
-
-catch(err){
-
-
-console.log(err);
-
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
-
-
-};
-// ======================
-// Get All Appointments
-// ======================
-
-const getAppointments = async(req,res)=>{
-
-
-try{
-
-
-const appointments =
-
-await Appointment.find()
-
-
-.populate(
-
-"patient",
-
-"name email"
-
-)
-
-
-.sort({
-
-date:1,
-
-doctor:1,
-
-token:1
-
-});
-
-
-
-
-res.json(
-appointments
-);
-
-
-
-}
-
-
-catch(err){
-
-
-console.log(err);
-
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
-
-
-};
-
-
-
-
-
-
-
-// ======================
-// Get Patient Appointments
-// ======================
-
-
-const getPatientAppointments = async(req,res)=>{
-
-
-try{
-
-
-const appointments =
-
-await Appointment.find({
-
-
-patient:req.params.id
-
-
-})
-
-
-.populate(
-
-"patient",
-
-"name email"
-
-)
-
-
-.sort({
-
-date:1,
-
-token:1
-
-});
-
-
-
-
-
-
-
-const today = new Date();
-
-
-
-today.setHours(
-0,
-0,
-0,
-0
-);
-
-
-
-
-
-
-
-const updatedAppointments = appointments.map(
-
-(appointment)=>{
-
-
-
-const appointmentObj =
-
-appointment.toObject();
-
-
-
-
-
-const appointmentDate =
-
-new Date(
-
-appointment.date
-
-);
-
-
-
-
-appointmentDate.setHours(
-
-0,
-
-0,
-
-0,
-
-0
-
-);
-
-
-
-
-
-
-
-
-// ======================
-// Future Appointment
-// ======================
-
-
-if(
-appointmentDate > today
-){
-
-
-
-appointmentObj.queueStarted = false;
-
-
-
-appointmentObj.queueStatus =
-"Scheduled";
-
-
-
-appointmentObj.waitingTime = null;
-
-
-
-appointmentObj.estimatedMessage =
-
-"Available on appointment day";
-
-
-
-}
-
-
-
-
-
-
-
-// ======================
-// Appointment Day
-// ======================
-
-
-else if(
-
-appointmentDate.getTime()
-
-===
-
-today.getTime()
-
-){
-
-
-
-appointmentObj.queueStarted = true;
-
-
-
-appointmentObj.queueStatus =
-
-"Running";
-
-
-
-
-
-// Calculate live waiting time
-
-
-if(
-
-appointmentObj.status === "Waiting"
-
-){
-
-
-
-const patientsAhead =
-
-appointments.filter(
-
-(item)=>
-
-item.doctor === appointment.doctor &&
-
-item.date === appointment.date &&
-
-item.status === "Waiting" &&
-
-item.token < appointment.token
-
-).length;
-
-
-
-
-
-appointmentObj.waitingTime =
-
-patientsAhead * 10;
-
-
-
-appointmentObj.patientsAhead =
-
-patientsAhead;
-
-
-
-}
-
-
-
-
-
-appointmentObj.estimatedMessage =
-
-`${appointmentObj.waitingTime || 0} minutes`;
-
-
-
-
-}
-
-
-
-
-
-
-
-
-// ======================
-// Past Appointment
-// ======================
-
-
-else{
-
-
-appointmentObj.queueStarted = false;
-
-
-
-appointmentObj.queueStatus =
-
-"Completed";
-
-
-
-appointmentObj.waitingTime = null;
-
-
-
-appointmentObj.estimatedMessage =
-
-"Completed";
-
-
-
-}
-
-
-
-
-
-return appointmentObj;
-
-
-
-}
-
-);
-
-
-
-
-
-
-
-res.json(
-
-updatedAppointments
-
-);
-
-
-
-}
-
 
 
 catch(err){
@@ -1089,9 +609,7 @@ const getDoctorAppointments = async(req,res)=>{
 try{
 
 
-const appointments =
-
-await Appointment.find({
+const appointments = await Appointment.find({
 
 
 doctor:req.params.name
@@ -1119,12 +637,7 @@ token:1
 
 
 
-
-res.json(
-
-appointments
-
-);
+res.json(appointments);
 
 
 
@@ -1132,7 +645,6 @@ appointments
 
 
 catch(err){
-
 
 
 console.log(err);
@@ -1159,7 +671,6 @@ message:err.message
 
 
 
-
 // ======================
 // Update Appointment Status
 // ======================
@@ -1171,13 +682,7 @@ const updateAppointmentStatus = async(req,res)=>{
 try{
 
 
-const {
-
-status
-
-}=req.body;
-
-
+const {status} = req.body;
 
 
 
@@ -1206,9 +711,6 @@ status
 console.log(
 "=============================="
 );
-
-
-
 
 
 
@@ -1244,13 +746,13 @@ new:true
 
 
 
-
 if(!appointment){
 
 
 return res.status(404).json({
 
 message:
+
 "Appointment not found"
 
 });
@@ -1264,9 +766,7 @@ message:
 
 
 
-const io =
-
-req.app.get("io");
+const io = req.app.get("io");
 
 
 
@@ -1278,19 +778,16 @@ console.log(
 );
 
 
-
 console.log(
 "Patient:",
 appointment.patient.toString()
 );
 
 
-
 console.log(
 "Doctor:",
 appointment.doctor
 );
-
 
 
 console.log(
@@ -1303,21 +800,18 @@ appointment.token
 
 
 
-
 // ===============================
-// Patient Turn Notification
+// Your Turn Notification
 // ===============================
 
 
-if(status==="In Progress"){
+if(status === "In Progress"){
 
 
 
 console.log(
 "🔥 YOUR TURN"
 );
-
-
 
 
 
@@ -1377,11 +871,6 @@ console.log(
 
 }
 
-
-
-
-
-
 // ===============================
 // Automatic Next Patient
 // ===============================
@@ -1437,9 +926,7 @@ if(nextPatient){
 
 
 nextPatient.status =
-
 "In Progress";
-
 
 
 await nextPatient.save();
@@ -1454,12 +941,10 @@ console.log(
 );
 
 
-
 console.log(
 "Token:",
 nextPatient.token
 );
-
 
 
 
@@ -1531,6 +1016,7 @@ console.log(
 
 
 
+
 // ===============================
 // Update Queue Positions
 // ===============================
@@ -1570,8 +1056,6 @@ token:1
 
 
 
-
-
 const today = new Date();
 
 
@@ -1586,8 +1070,6 @@ today.setHours(
 0
 
 );
-
-
 
 
 
@@ -1620,7 +1102,6 @@ appointmentDate.setHours(
 
 
 
-
 const queueStarted =
 
 appointmentDate.getTime()
@@ -1635,8 +1116,8 @@ today.getTime();
 
 
 
-
 for(
+
 let i=0;
 
 i<waitingAppointments.length;
@@ -1649,8 +1130,7 @@ i++
 
 waitingAppointments[i].queuePosition =
 
-i+1;
-
+i + 1;
 
 
 
@@ -1663,14 +1143,12 @@ if(queueStarted){
 
 waitingAppointments[i].waitingTime =
 
-i*10;
-
+i * 10;
 
 
 waitingAppointments[i].queueStarted =
 
 true;
-
 
 
 waitingAppointments[i].queueStatus =
@@ -1688,11 +1166,9 @@ waitingAppointments[i].waitingTime =
 null;
 
 
-
 waitingAppointments[i].queueStarted =
 
 false;
-
 
 
 waitingAppointments[i].queueStatus =
@@ -1701,6 +1177,7 @@ waitingAppointments[i].queueStatus =
 
 
 }
+
 
 
 
@@ -1716,18 +1193,9 @@ await waitingAppointments[i].save();
 
 
 
-
-
-
 console.log(
 "✅ Queue Updated"
 );
-
-
-
-
-
-
 
 // ===============================
 // Notify All Dashboards
@@ -1761,7 +1229,6 @@ console.log(
 
 
 
-
 res.json({
 
 
@@ -1786,9 +1253,13 @@ appointment
 catch(err){
 
 
+
 console.log(
+
 "❌ Error:",
+
 err
+
 );
 
 
@@ -1802,11 +1273,13 @@ err.message
 });
 
 
+
 }
 
 
 
 };
+
 
 
 
