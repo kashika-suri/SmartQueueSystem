@@ -11,7 +11,6 @@ const bookAppointment = async (req, res) => {
 
     const { patient, doctor, date } = req.body;
 
-
     const lastAppointment = await Appointment.findOne({
 
       doctor,
@@ -19,28 +18,39 @@ const bookAppointment = async (req, res) => {
 
     }).sort({
 
-      token:-1,
+      token: -1,
 
     });
 
-
-
     const token = lastAppointment
-
       ? lastAppointment.token + 1
-
       : 1;
-
-
 
     const queuePosition = token;
 
+    // ============================
+    // Waiting Time Logic
+    // ============================
 
-    const waitingTime =
-      (queuePosition - 1) * 10;
+    const today = new Date();
 
+    const appointmentDate = new Date(date);
 
+    today.setHours(0, 0, 0, 0);
 
+    appointmentDate.setHours(0, 0, 0, 0);
+
+    let waitingTime = null;
+
+    let queueStarted = false;
+
+    if (appointmentDate.getTime() === today.getTime()) {
+
+      waitingTime = (queuePosition - 1) * 10;
+
+      queueStarted = true;
+
+    }
 
     const appointment = new Appointment({
 
@@ -56,19 +66,13 @@ const bookAppointment = async (req, res) => {
 
       waitingTime,
 
+      queueStarted,
+
     });
-
-
-
 
     await appointment.save();
 
-
-
-
     const io = req.app.get("io");
-
-
 
     console.log("✅ Appointment Booked");
 
@@ -78,24 +82,11 @@ const bookAppointment = async (req, res) => {
 
     console.log("Token:", token);
 
-
-
-
-    io.emit(
-
-      "appointmentBooked",
-
-      appointment
-
-    );
-
-
-
-
+    io.emit("appointmentBooked", appointment);
 
     res.status(201).json({
 
-      message:"Appointment Booked Successfully",
+      message: "Appointment Booked Successfully",
 
       appointment,
 
@@ -103,32 +94,25 @@ const bookAppointment = async (req, res) => {
 
       waitingTime,
 
+      queueStarted,
+
     });
-
-
 
   }
 
-  catch(err){
-
+  catch (err) {
 
     console.log(err);
 
-
     res.status(500).json({
 
-      message:err.message,
+      message: err.message,
 
     });
 
-
   }
 
-
 };
-
-
-
 
 
 // ======================
@@ -194,58 +178,97 @@ const getPatientAppointments = async (req, res) => {
 
   try {
 
-
     const appointments = await Appointment.find({
 
-      patient:req.params.id,
+      patient: req.params.id,
 
     })
 
+      .populate(
 
-    .populate(
+        "patient",
 
-      "patient",
+        "name email"
 
-      "name email"
+      )
 
-    )
+      .sort({
 
+        date: -1,
 
-    .sort({
+      });
 
-      date:-1,
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const updatedAppointments = appointments.map((appointment) => {
+
+      const appointmentObj = appointment.toObject();
+
+      const appointmentDate = new Date(appointment.date);
+
+      appointmentDate.setHours(0, 0, 0, 0);
+
+      // =============================
+      // Before Appointment Date
+      // =============================
+
+      if (appointmentDate > today) {
+
+        appointmentObj.queueStarted = false;
+
+        appointmentObj.waitingTime = null;
+
+        appointmentObj.queueStatus = "Not Started";
+
+      }
+
+      // =============================
+      // Appointment Day
+      // =============================
+
+      else if (appointmentDate.getTime() === today.getTime()) {
+
+        appointmentObj.queueStarted = true;
+
+        appointmentObj.queueStatus = "Running";
+
+      }
+
+      // =============================
+      // Past Appointment
+      // =============================
+
+      else {
+
+        appointmentObj.queueStarted = false;
+
+        appointmentObj.queueStatus = "Completed";
+
+      }
+
+      return appointmentObj;
 
     });
 
-
-
-
-    res.json(appointments);
-
-
+    res.json(updatedAppointments);
 
   }
 
-  catch(err){
-
+  catch (err) {
 
     console.log(err);
 
-
-
     res.status(500).json({
 
-      message:err.message,
+      message: err.message,
 
     });
 
-
   }
 
-
 };
-
-
 
 
 
@@ -585,71 +608,58 @@ const updateAppointmentStatus = async (req,res)=>{
 // Update Queue Positions
 // ===============================
 
+const waitingAppointments = await Appointment.find({
 
-    const waitingAppointments = await Appointment.find({
+  doctor: appointment.doctor,
 
+  date: appointment.date,
 
-      doctor:appointment.doctor,
+  status: "Waiting",
 
+})
 
-      date:appointment.date,
+.sort({
 
+  token: 1,
 
-      status:"Waiting",
+});
 
+const today = new Date();
 
-    })
+today.setHours(0, 0, 0, 0);
 
+const appointmentDate = new Date(appointment.date);
 
-    .sort({
+appointmentDate.setHours(0, 0, 0, 0);
 
+const queueStarted =
+  appointmentDate.getTime() === today.getTime();
 
-      token:1,
+for (let i = 0; i < waitingAppointments.length; i++) {
 
+  waitingAppointments[i].queuePosition = i + 1;
 
-    });
+  if (queueStarted) {
 
+    waitingAppointments[i].waitingTime = i * 10;
 
+    waitingAppointments[i].queueStarted = true;
 
+  }
 
+  else {
 
-    for(
-      let i = 0;
-      i < waitingAppointments.length;
-      i++
-    ){
+    waitingAppointments[i].waitingTime = null;
 
+    waitingAppointments[i].queueStarted = false;
 
-      waitingAppointments[i].queuePosition =
-        i + 1;
+  }
 
+  await waitingAppointments[i].save();
 
+}
 
-      waitingAppointments[i].waitingTime =
-        i * 10;
-
-
-
-
-      await waitingAppointments[i].save();
-
-
-
-    }
-
-
-
-
-
-    console.log(
-      "✅ Queue updated"
-    );
-
-
-
-
-
-
+console.log("✅ Queue updated");
 
     // ===============================
     // Notify All Dashboards

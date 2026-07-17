@@ -40,10 +40,17 @@ const appointmentSchema = new mongoose.Schema({
         default: "Waiting"
     },
 
-    // Estimated Waiting Time (minutes)
+    // Estimated Waiting Time
+    // null means queue has not started yet
     waitingTime: {
         type: Number,
-        default: 0
+        default: null
+    },
+
+    // Queue starts only on appointment day
+    queueStarted: {
+        type: Boolean,
+        default: false
     }
 
 }, {

@@ -2,16 +2,20 @@ require("dotenv").config();
 
 console.log("🚀 THIS IS MY INDEX.JS");
 
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 
+
 // Routes
+
 const authRoutes = require("./routes/authRoutes");
 const appointmentRoutes = require("./routes/appointmentRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
+
 
 
 const app = express();
@@ -19,83 +23,173 @@ const app = express();
 const server = http.createServer(app);
 
 
+
+
 // ======================
 // Socket.IO Setup
 // ======================
 
+
 const io = new Server(server, {
 
+
   cors: {
+
+
     origin: "*",
-    methods: ["GET", "POST", "PUT"]
+
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT"
+    ]
+
+
   }
+
 
 });
 
 
-// Make io available everywhere
-app.set("io", io);
+
+
+// Make Socket available in controllers
+
+app.set(
+  "io",
+  io
+);
+
+
+
 
 
 // ======================
 // Middleware
 // ======================
 
-app.use(cors());
 
-app.use(express.json());
+app.use(
+  cors()
+);
+
+
+app.use(
+  express.json()
+);
+
+
+
+
 
 
 // ======================
 // Routes
 // ======================
 
-app.use("/api/auth", authRoutes);
 
-app.use("/api/appointments", appointmentRoutes);
+app.use(
+  "/api/auth",
+  authRoutes
+);
 
-app.use("/api/doctors", doctorRoutes);
+
+app.use(
+  "/api/appointments",
+  appointmentRoutes
+);
+
+
+app.use(
+  "/api/doctors",
+  doctorRoutes
+);
+
+
+
+
+
 
 
 // ======================
-// Home
+// Home Route
 // ======================
 
-app.get("/", (req, res) => {
 
-  res.send("Smart Queue Backend Running 🚀");
+app.get(
+  "/",
+  (req,res)=>{
 
-});
+
+    res.send(
+      "Smart Queue Backend Running 🚀"
+    );
+
+
+  }
+
+);
+
+
+
+
+
 
 
 // ======================
-// MongoDB
+// MongoDB Connection
 // ======================
+
 
 mongoose
-.connect(process.env.MONGO_URI)
+.connect(
+  process.env.MONGO_URI
+)
 
-.then(() => {
+.then(()=>{
 
-  console.log("✅ MongoDB Connected");
+
+  console.log(
+    "✅ MongoDB Connected"
+  );
+
 
 })
 
-.catch((err) => {
+.catch((err)=>{
 
-  console.log("❌ MongoDB Error:", err);
+
+  console.log(
+    "❌ MongoDB Error:",
+    err
+  );
+
 
 });
+
+
+
+
+
 
 
 // ======================
 // Socket.IO Connection
 // ======================
 
-io.on("connection", (socket) => {
+
+io.on(
+"connection",
+(socket)=>{
 
 
-  console.log("🟢 Connected:", socket.id);
+  console.log(
+    "🟢 Socket Connected:",
+    socket.id
+  );
+
+
 
 
 
@@ -103,18 +197,31 @@ io.on("connection", (socket) => {
   // Patient Room
   // ======================
 
-  socket.on("joinPatientRoom", (patientId) => {
+
+  socket.on(
+    "joinPatientRoom",
+    (patientId)=>{
 
 
-    socket.join(patientId);
+      socket.join(
+        patientId
+      );
 
 
-    console.log(
-      `👤 Patient Joined Room : ${patientId}`
-    );
+      console.log(
+
+        `👤 Patient Joined Room: ${patientId}`
+
+      );
 
 
-  });
+    }
+
+  );
+
+
+
+
 
 
 
@@ -122,18 +229,31 @@ io.on("connection", (socket) => {
   // Doctor Room
   // ======================
 
-  socket.on("joinDoctorRoom", (doctorName) => {
+
+  socket.on(
+    "joinDoctorRoom",
+    (doctorName)=>{
 
 
-    socket.join(doctorName);
+      socket.join(
+        doctorName
+      );
 
 
-    console.log(
-      `👨‍⚕️ Doctor Joined Room : ${doctorName}`
-    );
+      console.log(
+
+        `👨‍⚕️ Doctor Joined Room: ${doctorName}`
+
+      );
 
 
-  });
+    }
+
+  );
+
+
+
+
 
 
 
@@ -141,38 +261,58 @@ io.on("connection", (socket) => {
   // Disconnect
   // ======================
 
-  socket.on("disconnect", () => {
+
+  socket.on(
+    "disconnect",
+    ()=>{
 
 
-    console.log(
-      "🔴 Disconnected:",
-      socket.id
-    );
+      console.log(
+
+        "🔴 Socket Disconnected:",
+        socket.id
+
+      );
 
 
-  });
+    }
+
+  );
 
 
-});
+
+}
+
+);
 
 
-// Allow controllers to use socket
-global.io = io;
+
+
+
 
 
 // ======================
 // Server
 // ======================
 
-const PORT = process.env.PORT || 5000;
+
+const PORT =
+process.env.PORT || 5000;
 
 
-server.listen(PORT, () => {
+
+server.listen(
+PORT,
+()=>{
 
 
   console.log(
+
     `🚀 Server running on port ${PORT}`
+
   );
 
 
-});
+}
+
+);
