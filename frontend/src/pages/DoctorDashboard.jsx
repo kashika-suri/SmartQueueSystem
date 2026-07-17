@@ -27,7 +27,7 @@ function DoctorDashboard() {
 
       const response = await fetch(
 
-        `http://localhost:5000/api/appointments/doctor/${doctorName}`
+        `https://smartqueuesystem-production.up.railway.app/api/appointments/doctor/${doctorName}`
 
       );
 
@@ -65,7 +65,7 @@ function DoctorDashboard() {
 
       const response = await fetch(
 
-        `http://localhost:5000/api/appointments/${id}/status`,
+        `https://smartqueuesystem-production.up.railway.app/api/appointments/${id}/status`,
 
         {
 

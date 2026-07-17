@@ -17,7 +17,7 @@ function QueueBoard() {
     try {
 
       const response = await fetch(
-        "http://localhost:5000/api/appointments"
+        "https://smartqueuesystem-production.up.railway.app/api/appointments"
       );
 
       const data = await response.json();

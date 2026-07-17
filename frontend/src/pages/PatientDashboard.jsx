@@ -51,7 +51,7 @@ function PatientDashboard() {
 
       const response = await fetch(
 
-        `http://localhost:5000/api/appointments/patient/${userId}`
+        `https://smartqueuesystem-production.up.railway.app/api/appointments/patient/${userId}`
 
       );
 
