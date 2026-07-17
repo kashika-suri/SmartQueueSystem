@@ -26,6 +26,23 @@ const server = http.createServer(app);
 
 
 // ======================
+// Allowed Frontend URLs
+// ======================
+
+
+const allowedOrigins = [
+
+  "https://smart-queue-system-eta.vercel.app",
+
+  "http://localhost:5173"
+
+];
+
+
+
+
+
+// ======================
 // Socket.IO Setup
 // ======================
 
@@ -35,21 +52,27 @@ const io = new Server(server, {
 
   cors: {
 
-
-    origin: "*",
-
+    origin: allowedOrigins,
 
     methods: [
-      "GET",
-      "POST",
-      "PUT"
-    ]
 
+      "GET",
+
+      "POST",
+
+      "PUT",
+
+      "DELETE"
+
+    ],
+
+    credentials:true
 
   }
 
 
 });
+
 
 
 
@@ -65,19 +88,46 @@ app.set(
 
 
 
+
+
 // ======================
 // Middleware
 // ======================
 
 
 app.use(
-  cors()
+
+  cors({
+
+    origin: allowedOrigins,
+
+    methods:[
+
+      "GET",
+
+      "POST",
+
+      "PUT",
+
+      "DELETE",
+
+      "OPTIONS"
+
+    ],
+
+    credentials:true
+
+  })
+
 );
+
 
 
 app.use(
   express.json()
 );
+
+
 
 
 
@@ -90,21 +140,33 @@ app.use(
 
 
 app.use(
+
   "/api/auth",
+
   authRoutes
+
 );
 
 
+
 app.use(
+
   "/api/appointments",
+
   appointmentRoutes
+
 );
+
 
 
 app.use(
+
   "/api/doctors",
+
   doctorRoutes
+
 );
+
 
 
 
@@ -118,18 +180,23 @@ app.use(
 
 
 app.get(
-  "/",
-  (req,res)=>{
+
+"/",
+
+(req,res)=>{
 
 
-    res.send(
-      "Smart Queue Backend Running 🚀"
-    );
+res.send(
 
-
-  }
+"Smart Queue Backend Running 🚀"
 
 );
+
+
+}
+
+);
+
 
 
 
@@ -143,16 +210,17 @@ app.get(
 
 
 mongoose
+
 .connect(
-  process.env.MONGO_URI
+process.env.MONGO_URI
 )
 
 .then(()=>{
 
 
-  console.log(
-    "✅ MongoDB Connected"
-  );
+console.log(
+"✅ MongoDB Connected"
+);
 
 
 })
@@ -160,13 +228,15 @@ mongoose
 .catch((err)=>{
 
 
-  console.log(
-    "❌ MongoDB Error:",
-    err
-  );
+console.log(
+"❌ MongoDB Error:",
+err
+);
 
 
 });
+
+
 
 
 
@@ -180,76 +250,48 @@ mongoose
 
 
 io.on(
+
 "connection",
+
 (socket)=>{
 
 
-  console.log(
-    "🟢 Socket Connected:",
-    socket.id
-  );
+console.log(
 
+"🟢 Socket Connected:",
 
+socket.id
 
-
-
-  // ======================
-  // Patient Room
-  // ======================
-
-
-  socket.on(
-    "joinPatientRoom",
-    (patientId)=>{
-
-
-      socket.join(
-        patientId
-      );
-
-
-      console.log(
-
-        `👤 Patient Joined Room: ${patientId}`
-
-      );
-
-
-    }
-
-  );
+);
 
 
 
 
 
 
-
-  // ======================
-  // Doctor Room
-  // ======================
+// Patient Room
 
 
-  socket.on(
-    "joinDoctorRoom",
-    (doctorName)=>{
+socket.on(
+
+"joinPatientRoom",
+
+(patientId)=>{
 
 
-      socket.join(
-        doctorName
-      );
+socket.join(patientId);
 
 
-      console.log(
+console.log(
 
-        `👨‍⚕️ Doctor Joined Room: ${doctorName}`
+`👤 Patient Joined Room: ${patientId}`
 
-      );
+);
 
 
-    }
+}
 
-  );
+);
 
 
 
@@ -257,27 +299,60 @@ io.on(
 
 
 
-  // ======================
-  // Disconnect
-  // ======================
+
+// Doctor Room
 
 
-  socket.on(
-    "disconnect",
-    ()=>{
+socket.on(
+
+"joinDoctorRoom",
+
+(doctorName)=>{
 
 
-      console.log(
-
-        "🔴 Socket Disconnected:",
-        socket.id
-
-      );
+socket.join(doctorName);
 
 
-    }
+console.log(
 
-  );
+`👨‍⚕️ Doctor Joined Room: ${doctorName}`
+
+);
+
+
+}
+
+);
+
+
+
+
+
+
+
+
+// Disconnect
+
+
+socket.on(
+
+"disconnect",
+
+()=>{
+
+
+console.log(
+
+"🔴 Socket Disconnected:",
+
+socket.id
+
+);
+
+
+}
+
+);
 
 
 
@@ -291,26 +366,32 @@ io.on(
 
 
 
+
+
 // ======================
 // Server
 // ======================
 
 
 const PORT =
+
 process.env.PORT || 5000;
 
 
 
+
 server.listen(
+
 PORT,
+
 ()=>{
 
 
-  console.log(
+console.log(
 
-    `🚀 Server running on port ${PORT}`
+`🚀 Server running on port ${PORT}`
 
-  );
+);
 
 
 }
