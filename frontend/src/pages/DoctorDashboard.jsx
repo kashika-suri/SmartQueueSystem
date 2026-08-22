@@ -1,977 +1,613 @@
 import React, { useEffect, useState } from "react";
 import socket from "../socket";
+import API from "../api/api";
 
 function DoctorDashboard() {
 
-
   const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
+  // ==============================
+  // Get Logged-in Doctor
+  // ==============================
 
-  const user = JSON.parse(
-    localStorage.getItem("user")
-  );
+  const storedUser = localStorage.getItem("user");
 
+  let user = null;
 
-  const doctorName = user?.name;
+  try {
+    user = storedUser
+      ? JSON.parse(storedUser)
+      : null;
+  } catch (error) {
+    console.log("❌ Invalid user data in localStorage");
+  }
 
+  const doctor = user?.name;
 
-
-  // ======================
+  // ==============================
   // Fetch Doctor Appointments
-  // ======================
+  // ==============================
 
   const fetchAppointments = async () => {
 
     try {
 
+      if (!doctor) {
 
-      const response = await fetch(
+        console.log(
+          "❌ Doctor name not found in localStorage"
+        );
 
-        `https://smartqueuesystem-production.up.railway.app/api/appointments/doctor/${doctorName}`
+        setAppointments([]);
+        setLoading(false);
 
+        return;
+      }
+
+      console.log(
+        "👨‍⚕️ Fetching appointments for:",
+        doctor
       );
 
+      const response = await API.get(
+        `/appointments/doctor/${encodeURIComponent(doctor)}`
+      );
 
-      const data = await response.json();
+      console.log(
+        "📋 Doctor Appointments:",
+        response.data
+      );
 
+      setAppointments(
+        Array.isArray(response.data)
+          ? response.data
+          : []
+      );
 
-      setAppointments(data);
+    } catch (error) {
 
+      console.log(
+        "❌ Error fetching doctor appointments:",
+        error
+      );
 
+      setAppointments([]);
 
-    } catch(error) {
+    } finally {
 
-      console.log(error);
+      setLoading(false);
 
     }
 
   };
 
+  // ==============================
+  // Load Appointments
+  // + Socket.IO
+  // ==============================
 
+  useEffect(() => {
 
-
-
-
-  // ======================
-  // Update Status
-  // ======================
-
-
-  const updateStatus = async(id,status)=>{
-
-
-    try{
-
-
-      const response = await fetch(
-
-        `https://smartqueuesystem-production.up.railway.app/api/appointments/${id}/status`,
-
-        {
-
-          method:"PUT",
-
-          headers:{
-
-            "Content-Type":"application/json"
-
-          },
-
-
-          body:JSON.stringify({
-
-            status
-
-          })
-
-        }
-
-      );
-
-
-
-      const data = await response.json();
-
-
-      alert(data.message);
-
-
-      fetchAppointments();
-
-
-
-    }
-
-    catch(error){
-
-      console.log(error);
-
-    }
-
-
-  };
-
-
-
-
-
-
-  // ======================
-  // Socket.IO
-  // ======================
-
-
-  useEffect(()=>{
-
-
-    if(doctorName){
-
-      fetchAppointments();
-
-    }
-
-
-
-    socket.on(
-      "appointmentBooked",
-      fetchAppointments
-    );
-
-
+    fetchAppointments();
 
     socket.on(
       "statusUpdated",
       fetchAppointments
     );
 
+    socket.on(
+      "appointmentBooked",
+      fetchAppointments
+    );
 
-
-
-    return()=>{
-
-
-      socket.off(
-        "appointmentBooked",
-        fetchAppointments
-      );
-
+    return () => {
 
       socket.off(
         "statusUpdated",
         fetchAppointments
       );
 
+      socket.off(
+        "appointmentBooked",
+        fetchAppointments
+      );
 
     };
 
-
-  },[doctorName]);
-
+  }, [doctor]);
 
 
+  // ==============================
+  // Update Appointment Status
+  // ==============================
 
-  // ======================
-  // Statistics
-  // ======================
+  const updateStatus = async (id, status) => {
 
+    try {
 
-  const waitingPatients =
-    appointments.filter(
-      a=>a.status==="Waiting"
-    );
+      console.log(
+        "🔄 Updating appointment:",
+        id,
+        status
+      );
 
+      await API.put(
+        `/appointments/${id}/status`,
+        {
+          status
+        }
+      );
 
-  const completedPatients =
-    appointments.filter(
-      a=>a.status==="Completed"
-    );
+      // Refresh appointments
+      await fetchAppointments();
 
+    } catch (error) {
 
-  const currentPatient =
-    appointments.find(
-      a=>a.status==="In Progress"
-    );
+      console.log(
+        "❌ Error updating status:",
+        error
+      );
 
+    }
 
-  const nextPatient =
-    [...waitingPatients].sort(
-      (a,b)=>a.token-b.token
-    )[0];
-  return (
-
-    <div className="container-fluid bg-light py-4">
-
-      <div className="container">
-
-
-        {/* ======================
-            Header
-        ====================== */}
+  };
 
 
-        <div className="text-center mb-5">
+  // ==============================
+  // Loading
+  // ==============================
 
+  if (loading) {
 
-          <h1 className="fw-bold display-5 text-primary">
+    return (
 
-            🩺 Smart Queue Doctor Panel
+      <div className="container mt-5">
 
-          </h1>
+        <div className="text-center">
 
+          <div
+            className="spinner-border text-primary"
+            role="status"
+          ></div>
 
-          <p className="text-muted fs-5">
-
-            Welcome Dr. {doctorName}
-
+          <p className="mt-3">
+            Loading appointments...
           </p>
 
-
         </div>
 
+      </div>
 
+    );
 
+  }
 
 
-        {/* ======================
-            Statistics Cards
-        ====================== */}
+  // ==============================
+  // UI
+  // ==============================
 
+  return (
 
-        <div className="row g-4 mb-5">
+    <div className="container mt-5">
 
+      {/* ==========================
+          Header
+      ========================== */}
 
+      <div className="text-center mb-4">
 
-          {/* Total Patients */}
+        <h2 className="text-primary fw-bold">
 
-          <div className="col-lg-4 col-md-6">
+          👨‍⚕️ Doctor Dashboard
 
+        </h2>
 
-            <div className="card border-0 shadow-lg rounded-4 bg-primary text-white">
+        <p className="text-muted mb-0">
 
+          Welcome,{" "}
 
-              <div className="card-body text-center">
+          <strong>
+            {doctor || "Doctor"}
+          </strong>
 
+          {" "}👋
 
-                <div style={{fontSize:"45px"}}>
-
-                  👥
-
-                </div>
-
-
-                <h6 className="mt-3">
-
-                  Total Patients
-
-                </h6>
-
-
-                <h2 className="fw-bold">
-
-                  {appointments.length}
-
-                </h2>
-
-
-              </div>
-
-
-            </div>
-
-
-          </div>
-
-
-
-
-
-
-
-          {/* Waiting Patients */}
-
-
-          <div className="col-lg-4 col-md-6">
-
-
-            <div className="card border-0 shadow-lg rounded-4 bg-warning">
-
-
-              <div className="card-body text-center">
-
-
-                <div style={{fontSize:"45px"}}>
-
-                  ⏳
-
-                </div>
-
-
-                <h6 className="mt-3">
-
-                  Waiting Patients
-
-                </h6>
-
-
-                <h2 className="fw-bold">
-
-                  {waitingPatients.length}
-
-                </h2>
-
-
-              </div>
-
-
-            </div>
-
-
-          </div>
-
-
-
-
-
-
-
-          {/* Completed Patients */}
-
-
-          <div className="col-lg-4 col-md-6">
-
-
-            <div className="card border-0 shadow-lg rounded-4 bg-success text-white">
-
-
-              <div className="card-body text-center">
-
-
-                <div style={{fontSize:"45px"}}>
-
-                  ✅
-
-                </div>
-
-
-                <h6 className="mt-3">
-
-                  Completed
-
-                </h6>
-
-
-                <h2 className="fw-bold">
-
-                  {completedPatients.length}
-
-                </h2>
-
-
-              </div>
-
-
-            </div>
-
-
-          </div>
-
-
-
-        </div>
-                {/* ======================
-            Current & Next Patient
-        ====================== */}
-
-
-        <div className="row g-4 mb-5">
-
-
-
-          {/* Current Patient */}
-
-
-          <div className="col-lg-6">
-
-
-            <div className="card border-0 shadow-lg rounded-4 h-100">
-
-
-              <div className="card-header bg-success text-white rounded-top-4">
-
-
-                <h4 className="mb-0">
-
-                  🩺 Current Patient
-
-                </h4>
-
-
-              </div>
-
-
-
-
-
-              <div className="card-body text-center">
-
-
-              {
-
-
-              currentPatient ?
-
-
-              <>
-
-
-                <div
-                  className="rounded-circle bg-success text-white mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{
-                    width:"90px",
-                    height:"90px",
-                    fontSize:"40px"
-                  }}
-                >
-
-                  👤
-
-                </div>
-
-
-
-
-                <h2 className="fw-bold">
-
-                  {currentPatient.patient?.name}
-
-                </h2>
-
-
-
-
-                <hr />
-
-
-
-
-                <h4>
-
-                  Token #{currentPatient.token}
-
-                </h4>
-
-
-
-
-                <p className="text-muted">
-
-                  Date: {currentPatient.date}
-
-                </p>
-
-
-
-
-                <span className="badge bg-success fs-6">
-
-                  Currently Consulting
-
-                </span>
-
-
-
-              </>
-
-
-
-              :
-
-
-
-              <div className="py-5">
-
-
-                <h2>
-
-                  😴
-
-                </h2>
-
-
-                <h5 className="text-muted">
-
-                  No Patient In Progress
-
-                </h5>
-
-
-              </div>
-
-
-
-              }
-
-
-              </div>
-
-
-
-            </div>
-
-
-          </div>
-
-          {/* Next Patient */}
-
-
-
-          <div className="col-lg-6">
-
-
-            <div className="card border-0 shadow-lg rounded-4 h-100">
-
-
-              <div className="card-header bg-warning rounded-top-4">
-
-
-                <h4 className="mb-0">
-
-                  ⏭ Next Patient
-
-                </h4>
-
-
-              </div>
-
-
-
-
-
-              <div className="card-body text-center">
-
-
-              {
-
-
-              nextPatient ?
-
-
-              <>
-
-
-                <div
-                  className="rounded-circle bg-warning mx-auto mb-3 d-flex align-items-center justify-content-center"
-                  style={{
-                    width:"90px",
-                    height:"90px",
-                    fontSize:"40px"
-                  }}
-                >
-
-                  ⏳
-
-                </div>
-
-
-
-
-                <h2 className="fw-bold">
-
-                  {nextPatient.patient?.name}
-
-                </h2>
-
-
-
-
-                <hr />
-
-
-
-
-                <h4>
-
-                  Token #{nextPatient.token}
-
-                </h4>
-
-
-
-
-                <p className="text-muted">
-
-                  Date: {nextPatient.date}
-
-                </p>
-
-
-
-
-                <span className="badge bg-warning text-dark fs-6">
-
-                  Waiting
-
-                </span>
-
-
-
-              </>
-
-
-
-              :
-
-
-
-              <div className="py-5">
-
-
-                <h2>
-
-                  🎉
-
-                </h2>
-
-
-                <h5 className="text-muted">
-
-                  Queue Empty
-
-                </h5>
-
-
-              </div>
-
-
-
-              }
-
-
-
-              </div>
-
-
-            </div>
-
-
-          </div>
-
-
-
-
-        </div>
-                {/* ======================
-            Patient Queue Table
-        ====================== */}
-
-
-        <div className="card border-0 shadow-lg rounded-4 mb-5">
-
-
-          <div className="card-header bg-dark text-white rounded-top-4">
-
-
-            <h4 className="mb-0">
-
-              📋 Patient Queue Management
-
-            </h4>
-
-
-          </div>
-
-
-
-
-
-          <div className="card-body">
-
-
-
-            <div className="table-responsive">
-
-
-
-              <table className="table table-hover align-middle">
-
-
-
-                <thead className="table-light">
-
-
-                  <tr>
-
-
-                    <th>
-                      Token
-                    </th>
-
-
-                    <th>
-                      Patient
-                    </th>
-
-
-                    <th>
-                      Date
-                    </th>
-
-
-                    <th>
-                      Status
-                    </th>
-
-
-                    <th>
-                      Change Status
-                    </th>
-
-
-                  </tr>
-
-
-                </thead>
-
-
-
-
-
-                <tbody>
-
-
-                {
-
-
-                appointments.length > 0 ?
-
-
-                appointments.map((appointment)=>(
-
-
-                  <tr key={appointment._id}>
-
-
-                    <td>
-
-
-                      <span className="badge bg-primary">
-
-                        #{appointment.token}
-
-                      </span>
-
-
-                    </td>
-
-
-
-
-
-                    <td>
-
-                      {appointment.patient?.name || "Unknown"}
-
-                    </td>
-
-
-
-
-
-                    <td>
-
-                      {appointment.date}
-
-                    </td>
-
-
-
-
-
-                    <td>
-
-
-                      <span
-
-                      className={`badge ${
-                        
-                        appointment.status==="Waiting"
-
-                        ?
-
-                        "bg-warning text-dark"
-
-                        :
-
-                        appointment.status==="In Progress"
-
-                        ?
-
-                        "bg-primary"
-
-                        :
-
-                        appointment.status==="Completed"
-
-                        ?
-
-                        "bg-success"
-
-                        :
-
-                        "bg-danger"
-
-                      }`}
-
-
-                      >
-
-
-                        {appointment.status}
-
-
-                      </span>
-
-
-                    </td>
-
-
-
-
-
-
-
-                    <td>
-
-
-                      <select
-
-                        className="form-select"
-
-
-                        value={appointment.status}
-
-
-                        onChange={(e)=>
-
-                          updateStatus(
-
-                            appointment._id,
-
-                            e.target.value
-
-                          )
-
-                        }
-
-
-                      >
-
-
-                        <option value="Waiting">
-
-                          Waiting
-
-                        </option>
-
-
-
-                        <option value="In Progress">
-
-                          In Progress
-
-                        </option>
-
-
-
-                        <option value="Completed">
-
-                          Completed
-
-                        </option>
-
-
-
-                        <option value="Cancelled">
-
-                          Cancelled
-
-                        </option>
-
-
-
-                      </select>
-
-
-                    </td>
-
-
-
-
-                  </tr>
-
-
-                ))
-
-
-
-                :
-
-
-
-                <tr>
-
-
-                  <td 
-                  colSpan="5"
-                  className="text-center"
-                  >
-
-                    No Patients Today
-
-
-                  </td>
-
-
-                </tr>
-
-
-
-                }
-
-
-
-                </tbody>
-
-
-
-              </table>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-        </div>
-
-
-
-
+        </p>
 
       </div>
 
 
-    </div>
+      {/* ==========================
+          Doctor Information
+      ========================== */}
 
+      <div className="card shadow-sm mb-4">
+
+        <div className="card-body">
+
+          <div className="row text-center">
+
+            <div className="col-md-4">
+
+              <h6 className="text-muted">
+                Doctor
+              </h6>
+
+              <h5 className="fw-bold">
+                {doctor || "N/A"}
+              </h5>
+
+            </div>
+
+
+            <div className="col-md-4">
+
+              <h6 className="text-muted">
+                Total Appointments
+              </h6>
+
+              <h5 className="fw-bold text-primary">
+                {appointments.length}
+              </h5>
+
+            </div>
+
+
+            <div className="col-md-4">
+
+              <h6 className="text-muted">
+                Waiting Patients
+              </h6>
+
+              <h5 className="fw-bold text-warning">
+
+                {
+                  appointments.filter(
+                    (appointment) =>
+                      appointment.status === "Waiting"
+                  ).length
+                }
+
+              </h5>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* ==========================
+          Appointment Table
+      ========================== */}
+
+      <div className="card shadow-lg">
+
+        <div className="card-body">
+
+          <h5 className="fw-bold mb-4">
+
+            📋 Today's Appointments
+
+          </h5>
+
+
+          <div className="table-responsive">
+
+            <table className="table table-hover align-middle">
+
+              <thead className="table-dark">
+
+                <tr>
+
+                  <th>Token</th>
+
+                  <th>Patient</th>
+
+                  <th>Date</th>
+
+                  <th>Time Slot</th>
+
+                  <th>Status</th>
+
+                  <th>Action</th>
+
+                </tr>
+
+              </thead>
+
+
+              <tbody>
+
+                {
+
+                  appointments.length > 0
+
+                    ?
+
+                    appointments.map(
+                      (appointment) => (
+
+                        <tr
+                          key={
+                            appointment._id
+                          }
+                        >
+
+                          {/* Token */}
+
+                          <td>
+
+                            <span className="badge bg-primary">
+
+                              #
+                              {
+                                appointment.token
+                              }
+
+                            </span>
+
+                          </td>
+
+
+                          {/* Patient */}
+
+                          <td>
+
+                            <div>
+
+                              <h6 className="mb-0">
+
+                                {
+                                  appointment.patient?.name ||
+                                  "Unknown Patient"
+                                }
+
+                              </h6>
+
+                              <small className="text-muted">
+
+                                {
+                                  appointment.patient?.email ||
+                                  ""
+                                }
+
+                              </small>
+
+                            </div>
+
+                          </td>
+
+
+                          {/* Date */}
+
+                          <td>
+
+                            {
+                              appointment.date ||
+                              "N/A"
+                            }
+
+                          </td>
+
+
+                          {/* Slot */}
+
+                          <td>
+
+                            🕒{" "}
+
+                            {
+                              appointment.slot ||
+                              "N/A"
+                            }
+
+                          </td>
+
+
+                          {/* Status */}
+
+                          <td>
+
+                            <span
+
+                              className={`
+                                badge
+                                px-3
+                                py-2
+                                ${
+                                  appointment.status ===
+                                  "Waiting"
+
+                                    ? "bg-warning text-dark"
+
+                                    : appointment.status ===
+                                      "In Progress"
+
+                                    ? "bg-primary"
+
+                                    : appointment.status ===
+                                      "Completed"
+
+                                    ? "bg-success"
+
+                                    : appointment.status ===
+                                      "Cancelled"
+
+                                    ? "bg-danger"
+
+                                    : "bg-secondary"
+                                }
+                              `}
+
+                            >
+
+                              {
+                                appointment.status ||
+                                "Unknown"
+                              }
+
+                            </span>
+
+                          </td>
+
+
+                          {/* Actions */}
+
+                          <td>
+
+                            {/* Start */}
+
+                            {
+                              appointment.status ===
+                                "Waiting" && (
+
+                                <button
+
+                                  className="btn btn-primary btn-sm me-2"
+
+                                  onClick={() =>
+                                    updateStatus(
+                                      appointment._id,
+                                      "In Progress"
+                                    )
+                                  }
+
+                                >
+
+                                  ▶️ Start
+
+                                </button>
+
+                              )
+                            }
+
+
+                            {/* Complete */}
+
+                            {
+                              appointment.status ===
+                                "In Progress" && (
+
+                                <button
+
+                                  className="btn btn-success btn-sm me-2"
+
+                                  onClick={() =>
+                                    updateStatus(
+                                      appointment._id,
+                                      "Completed"
+                                    )
+                                  }
+
+                                >
+
+                                  ✅ Complete
+
+                                </button>
+
+                              )
+                            }
+
+
+                            {/* Cancel */}
+
+                            {
+                              appointment.status !==
+                                "Completed" &&
+
+                              appointment.status !==
+                                "Cancelled" && (
+
+                                <button
+
+                                  className="btn btn-danger btn-sm"
+
+                                  onClick={() =>
+                                    updateStatus(
+                                      appointment._id,
+                                      "Cancelled"
+                                    )
+                                  }
+
+                                >
+
+                                  ❌ Cancel
+
+                                </button>
+
+                              )
+                            }
+
+                          </td>
+
+                        </tr>
+
+                      )
+                    )
+
+                    :
+
+                    (
+
+                      <tr>
+
+                        <td
+                          colSpan="6"
+                          className="text-center py-5"
+                        >
+
+                          <div>
+
+                            <div
+                              style={{
+                                fontSize: "40px"
+                              }}
+                            >
+                              📭
+                            </div>
+
+                            <h5 className="mt-3">
+
+                              No appointments found
+
+                            </h5>
+
+                            <p className="text-muted mb-0">
+
+                              No patients have booked
+                              an appointment with you yet.
+
+                            </p>
+
+                          </div>
+
+                        </td>
+
+                      </tr>
+
+                    )
+
+                }
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
 
   );
 
-
 }
-
 
 export default DoctorDashboard;

@@ -2,17 +2,11 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import BookAppointment from "../components/BookAppointment";
 import socket from "../socket";
-
+import API from "../api/api";
 
 function PatientDashboard() {
 
-
-  // ======================
-  // States
-  // ======================
-
   const [appointments, setAppointments] = useState([]);
-
 
   const [notification, setNotification] = useState({
 
@@ -22,29 +16,23 @@ function PatientDashboard() {
 
     token: "",
 
-    message: "",
+    slot: "",
+
+    message: ""
 
   });
 
-
-
   const navigate = useNavigate();
-
 
   const userId = localStorage.getItem("userId");
 
-
   const user = JSON.parse(
+
     localStorage.getItem("user")
+
   );
 
-
-
-  // ======================
-  // Logout
-  // ======================
-
-  const handleLogout = () => {
+  const handleLogout = ()=>{
 
     localStorage.clear();
 
@@ -52,94 +40,57 @@ function PatientDashboard() {
 
   };
 
+  const fetchAppointments = async()=>{
 
+    try{
 
-  // ======================
-  // Fetch Appointments
-  // ======================
+      const response = await API.get(
 
-  const fetchAppointments = async () => {
-
-
-    try {
-
-
-      const response = await fetch(
-
-        `https://smartqueuesystem-production.up.railway.app/api/appointments/patient/${userId}`
+        `/appointments/patient/${userId}`
 
       );
 
+      setAppointments(
 
-      const data = await response.json();
+        response.data
 
-
-      setAppointments(data);
-
-
-    }
-
-    catch(error){
-
-
-      console.log(
-        "Fetch Appointment Error:",
-        error
       );
 
-
     }
 
+    catch(err){
+
+      console.log(err);
+
+    }
 
   };
-  // ======================
-  // Socket.IO
-  // ======================
 
-  useEffect(() => {
-
+  useEffect(()=>{
 
     if(!userId) return;
 
-
-
-    // Initial Fetch
-
     fetchAppointments();
 
-
-
-    // ======================
-    // Socket Connection
-    // ======================
-
-    const handleConnect = () => {
-
+    const handleConnect = ()=>{
 
       console.log(
-        "✅ Socket Connected:",
+
+        "🟢 Socket Connected:",
+
         socket.id
+
       );
-
-
-      // Join patient personal room
 
       socket.emit(
+
         "joinPatientRoom",
+
         userId
+
       );
-
-
-      console.log(
-        "Patient Room Joined:",
-        userId
-      );
-
 
     };
-
-
-
 
     if(socket.connected){
 
@@ -147,323 +98,178 @@ function PatientDashboard() {
 
     }
 
-
-
     socket.on(
+
       "connect",
+
       handleConnect
+
     );
 
-
-
-
     socket.on(
-      "connect_error",
-      (error)=>{
 
-        console.log(
-          "❌ Socket Error:",
-          error.message
-        );
-
-      }
-    );
-
-
-
-
-    socket.on(
-      "disconnect",
-      (reason)=>{
-
-        console.log(
-          "🔴 Socket Disconnected:",
-          reason
-        );
-
-      }
-    );
-
-
-
-
-
-    // ======================
-    // Appointment Booked
-    // ======================
-
-
-    const handleAppointmentBooked = ()=>{
-
-
-      fetchAppointments();
-
-
-    };
-
-
-
-
-
-    // ======================
-    // Status Updated
-    // ======================
-
-
-    const handleStatusUpdated = ()=>{
-
-
-      fetchAppointments();
-
-
-    };
-
-
-
-
-
-    // ======================
-    // YOUR TURN EVENT
-    // ======================
-
-
-    const handleYourTurn = (data)=>{
-
-
-      console.log(
-        "🚨 YOUR TURN EVENT RECEIVED"
-      );
-
-
-      console.log(data);
-
-
-
-      fetchAppointments();
-
-
-
-
-      // ======================
-      // Voice Announcement
-      // ======================
-
-
-      if(
-        "speechSynthesis" in window
-      ){
-
-
-        const speech =
-        new SpeechSynthesisUtterance(
-
-
-          `Attention please. Token number ${data.token}. Please proceed to Doctor ${data.doctor}.`
-
-        );
-
-
-
-        speech.rate = 1;
-
-        speech.pitch = 1;
-
-        speech.volume = 1;
-
-
-
-        window.speechSynthesis.cancel();
-
-
-        window.speechSynthesis.speak(
-          speech
-        );
-
-
-      }
-
-
-
-
-
-
-      // ======================
-      // Show Popup
-      // ======================
-
-
-      setNotification({
-
-        show:true,
-
-        doctor:data.doctor,
-
-        token:data.token,
-
-        message:data.message,
-
-      });
-
-
-
-    };
-
-
-
-
-
-
-
-    // Register Events
-
-
-    socket.on(
       "appointmentBooked",
-      handleAppointmentBooked
+
+      fetchAppointments
+
     );
 
-
-
     socket.on(
+
       "statusUpdated",
-      handleStatusUpdated
+
+      fetchAppointments
+
     );
+        socket.on(
 
-
-
-    socket.on(
       "yourTurn",
-      handleYourTurn
+
+      (data)=>{
+
+        fetchAppointments();
+
+        if("speechSynthesis" in window){
+
+          const speech = new SpeechSynthesisUtterance(
+
+            `Attention please. Token number ${data.token}. Please proceed to ${data.doctor}.`
+
+          );
+
+          speech.rate = 1;
+
+          speech.pitch = 1;
+
+          speech.volume = 1;
+
+          window.speechSynthesis.cancel();
+
+          window.speechSynthesis.speak(speech);
+
+        }
+
+        setNotification({
+
+          show:true,
+
+          doctor:data.doctor,
+
+          token:data.token,
+
+          slot:data.slot,
+
+          message:data.message
+
+        });
+
+      }
+
     );
-
-
-
-
-
-
-
-
-    // Cleanup
-
 
     return ()=>{
 
-
       socket.off(
+
         "connect",
+
         handleConnect
+
       );
 
-
       socket.off(
+
         "appointmentBooked",
-        handleAppointmentBooked
+
+        fetchAppointments
+
       );
 
-
       socket.off(
+
         "statusUpdated",
-        handleStatusUpdated
-      );
 
+        fetchAppointments
+
+      );
 
       socket.off(
-        "yourTurn",
-        handleYourTurn
+
+        "yourTurn"
+
       );
-
-
-
-      socket.off(
-        "connect_error"
-      );
-
-
-      socket.off(
-        "disconnect"
-      );
-
 
     };
 
-
-
   },[userId]);
-  // ======================
-  // Current Appointment
-  // ======================
-
 
   const currentAppointment = appointments.find(
 
     (appointment)=>
 
-      appointment.status === "Waiting" ||
+      appointment.status==="Waiting" ||
 
-      appointment.status === "In Progress"
+      appointment.status==="In Progress"
 
   );
 
-
-
-
-
-  // ======================
-  // Patients Ahead
-  // ======================
-
-
   const patientsAhead =
-
 
     currentAppointment &&
 
-    currentAppointment.status === "Waiting"
+    currentAppointment.queueStarted &&
 
+    currentAppointment.status==="Waiting"
 
-      ?
+    ?
 
+    appointments.filter(
 
-      appointments.filter(
+      (appointment)=>
 
-        (appointment)=>
+        appointment.doctor===currentAppointment.doctor &&
 
-          appointment.status === "Waiting" &&
+        appointment.date===currentAppointment.date &&
 
-          appointment.token < currentAppointment.token
+        appointment.slot===currentAppointment.slot &&
 
-      ).length
+        appointment.status==="Waiting" &&
 
+        appointment.token<currentAppointment.token
 
-      :
+    ).length
 
-      0;
+    :
 
+    0;
 
+  const getEstimatedTime = (appointment)=>{
 
+    if(!appointment){
 
+      return "-";
 
+    }
 
+    if(
 
-  // ======================
-  // Estimated Time
-  // ======================
+      !appointment.queueStarted ||
 
+      appointment.waitingTime===null
 
-  const getEstimatedTime = (minutes)=>{
+    ){
 
+      return "Available on appointment day";
+
+    }
 
     const time = new Date();
 
-
-
     time.setMinutes(
 
-      time.getMinutes() + (minutes || 0)
+      time.getMinutes() + appointment.waitingTime
 
     );
-
-
 
     return time.toLocaleTimeString([],{
 
@@ -473,878 +279,763 @@ function PatientDashboard() {
 
     });
 
-
   };
 
+  return(
 
-return (
+    <div className="container mt-5">
+            {
 
-<div className="container mt-5">
+        notification.show && (
 
+          <div
 
-{/* ======================
-    Notification Popup
-====================== */}
+            className="position-fixed top-0 start-50 translate-middle-x mt-4"
 
-{notification.show && (
+            style={{
 
-<div
-className="position-fixed top-0 start-50 translate-middle-x mt-4"
-style={{
-zIndex:9999,
-width:"420px",
-animation:"fadeInDown 0.5s ease"
-}}
->
+              zIndex:9999,
 
+              width:"420px"
 
-<div className="card shadow-lg border-0 rounded-4">
+            }}
 
+          >
 
-<div className="card-header bg-danger text-white text-center">
+            <div className="card shadow-lg border-0 rounded-4">
 
-<h3 className="mb-0">
+              <div className="card-header bg-danger text-white text-center">
 
-🔔 YOUR TURN HAS ARRIVED
+                <h3 className="mb-0">
 
-</h3>
+                  🔔 YOUR TURN
 
-</div>
+                </h3>
 
+              </div>
 
+              <div className="card-body text-center">
 
-<div className="card-body text-center">
+                <div
 
+                  className="rounded-circle bg-danger text-white mx-auto mb-3 d-flex align-items-center justify-content-center"
 
-<div
+                  style={{
 
-className="rounded-circle bg-danger text-white mx-auto mb-3 d-flex align-items-center justify-content-center"
+                    width:90,
 
-style={{
+                    height:90,
 
-width:90,
+                    fontSize:"42px"
 
-height:90,
+                  }}
 
-fontSize:"42px"
+                >
 
-}}
+                  👨‍⚕️
 
->
+                </div>
 
-👨‍⚕️
+                <h4 className="fw-bold">
 
-</div>
+                  {notification.message}
 
+                </h4>
 
+                <hr/>
 
+                <h5>
 
-<h4 className="fw-bold">
+                  Doctor :
 
-{notification.message}
+                  <span className="text-primary">
 
-</h4>
+                    {" "}
 
+                    {notification.doctor}
 
+                  </span>
 
+                </h5>
 
-<hr/>
+                <h5>
 
+                  Time Slot :
 
+                  <span className="text-success">
 
+                    {" "}
 
-<h5>
+                    {notification.slot}
 
-👨‍⚕️ Doctor:
+                  </span>
 
-<span className="text-primary">
+                </h5>
 
-{" "}{notification.doctor}
+                <h2 className="text-danger mt-3">
 
-</span>
+                  Token #{notification.token}
 
-</h5>
+                </h2>
 
+                <button
 
+                  className="btn btn-success mt-3"
 
+                  onClick={()=>setNotification({
 
-<h2 className="text-danger fw-bold mt-3">
+                    show:false,
 
-🎫 Token #{notification.token}
+                    doctor:"",
 
-</h2>
+                    token:"",
 
+                    slot:"",
 
+                    message:""
 
+                  })}
 
-<p className="text-muted mt-3">
+                >
 
-Please proceed to the doctor's cabin.
+                  OK
 
-</p>
+                </button>
 
+              </div>
 
+            </div>
 
+          </div>
 
+        )
 
-<button
+      }
 
-className="btn btn-success px-4"
+      <div className="d-flex justify-content-between align-items-center mb-4">
 
-onClick={()=>
+        <div>
 
+          <h2 className="fw-bold">
 
-setNotification({
+            Welcome, {user?.name} 👋
 
-show:false,
+          </h2>
 
-doctor:"",
+          <p className="text-muted">
 
-token:"",
+            Patient Dashboard
 
-message:"",
+          </p>
 
-})
+        </div>
 
+        <button
+
+          className="btn btn-danger"
+
+          onClick={handleLogout}
+
+        >
+
+          Logout
+
+        </button>
+
+      </div>
+
+      <div className="row">
+
+        <div className="col-md-3 mb-3">
+
+          <div className="card shadow border-0 rounded-4 text-center p-3 h-100">
+
+            <div style={{fontSize:"40px"}}>
+
+              📅
+
+            </div>
+
+            <h6>Total Appointments</h6>
+
+            <h2 className="fw-bold text-primary">
+
+              {appointments.length}
+
+            </h2>
+
+          </div>
+
+        </div>
+
+        <div className="col-md-3 mb-3">
+
+          <div className="card shadow border-0 rounded-4 text-center p-3 h-100">
+
+            <div style={{fontSize:"40px"}}>
+
+              📋
+
+            </div>
+
+            <h6>Status</h6>
+
+            <h5 className="fw-bold">
+
+              {
+
+                currentAppointment
+
+                ?
+
+                currentAppointment.queueStarted
+
+                ?
+
+                currentAppointment.status
+
+                :
+
+                "Scheduled"
+
+                :
+
+                "No Appointment"
+
+              }
+
+            </h5>
+
+          </div>
+
+        </div>
+
+        <div className="col-md-2 mb-3">
+
+          <div className="card shadow border-0 rounded-4 text-center p-3 h-100">
+
+            <div style={{fontSize:"40px"}}>
+
+              🎫
+
+            </div>
+
+            <h6>Token</h6>
+
+            <h2 className="fw-bold text-danger">
+
+              {
+
+                currentAppointment
+
+                ?
+
+                currentAppointment.token
+
+                :
+
+                "-"
+
+              }
+
+            </h2>
+
+          </div>
+
+        </div>
+
+        <div className="col-md-2 mb-3">
+
+          <div className="card shadow border-0 rounded-4 text-center p-3 h-100">
+
+            <div style={{fontSize:"40px"}}>
+
+              👥
+
+            </div>
+
+            <h6>Patients Ahead</h6>
+
+            <h2 className="fw-bold text-warning">
+
+              {
+
+                currentAppointment?.queueStarted
+
+                ?
+
+                patientsAhead
+
+                :
+
+                "-"
+
+              }
+
+            </h2>
+
+          </div>
+
+        </div>
+
+        <div className="col-md-2 mb-3">
+
+          <div className="card shadow border-0 rounded-4 text-center p-3 h-100">
+
+            <div style={{fontSize:"40px"}}>
+
+              ⏱️
+
+            </div>
+
+            <h6>Estimated</h6>
+
+            <h6 className="fw-bold text-success">
+
+              {getEstimatedTime(currentAppointment)}
+
+            </h6>
+
+          </div>
+
+        </div>
+
+      </div>
+            {
+
+        currentAppointment && (
+
+          <div className="card shadow-lg border-0 rounded-4 mt-4">
+
+            <div className="card-header bg-info text-white">
+
+              <h4 className="mb-0">
+
+                📅 Appointment Details
+
+              </h4>
+
+            </div>
+
+            <div className="card-body">
+
+              <div className="row">
+
+                <div className="col-md-3">
+
+                  <strong>Doctor</strong>
+
+                  <p>
+
+                    👨‍⚕️ {currentAppointment.doctor}
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-3">
+
+                  <strong>Date</strong>
+
+                  <p>
+
+                    {currentAppointment.date}
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-3">
+
+                  <strong>Time Slot</strong>
+
+                  <p>
+
+                    🕒 {currentAppointment.slot}
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-3">
+
+                  <strong>Token</strong>
+
+                  <p>
+
+                    #{currentAppointment.token}
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-4">
+
+                  <strong>Queue Status</strong>
+
+                  <p>
+
+                    {
+
+                      currentAppointment.queueStarted
+
+                      ?
+
+                      "Running"
+
+                      :
+
+                      "Not Started"
+
+                    }
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-4">
+
+                  <strong>Estimated Wait</strong>
+
+                  <p>
+
+                    {
+
+                      currentAppointment.queueStarted
+
+                      ?
+
+                      `${currentAppointment.waitingTime ?? 0} mins`
+
+                      :
+
+                      "Available on appointment day"
+
+                    }
+
+                  </p>
+
+                </div>
+
+                <div className="col-md-4">
+
+                  <strong>Patients Ahead</strong>
+
+                  <p>
+
+                    {
+
+                      currentAppointment.queueStarted
+
+                      ?
+
+                      patientsAhead
+
+                      :
+
+                      "-"
+
+                    }
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        )
+
+      }
+
+      <div className="row mt-4">
+
+        <div className="col-lg-5 mb-4">
+
+          <BookAppointment
+
+            onBookingSuccess={fetchAppointments}
+
+          />
+
+        </div>
+
+        <div className="col-lg-7">
+
+          <div className="card shadow-lg border-0 rounded-4">
+
+            <div className="card-header bg-primary text-white">
+
+              <h4 className="mb-0">
+
+                📋 My Appointments
+
+              </h4>
+
+            </div>
+
+            <div className="card-body">
+
+              <div className="table-responsive">
+
+                <table className="table table-hover align-middle">
+
+                  <thead className="table-dark">
+
+                    <tr>
+
+                      <th>Doctor</th>
+
+                      <th>Date</th>
+
+                      <th>Slot</th>
+
+                      <th>Token</th>
+
+                      <th>Waiting</th>
+
+                      <th>Status</th>
+
+                    </tr>
+
+                  </thead>
+
+                  <tbody>
+
+                    {
+
+                      appointments.length > 0
+
+                      ?
+
+                      appointments.map((appointment)=>(
+
+                        <tr key={appointment._id}>
+
+                          <td>
+
+                            👨‍⚕️ {appointment.doctor}
+
+                          </td>
+
+                          <td>
+
+                            {appointment.date}
+
+                          </td>
+
+                          <td>
+
+                            🕒 {appointment.slot}
+
+                          </td>
+
+                          <td>
+
+                            <span className="badge bg-primary">
+
+                              #{appointment.token}
+
+                            </span>
+
+                          </td>
+                                                    <td>
+
+                            {
+
+                              !appointment.queueStarted
+
+                              ?
+
+                              <span className="text-secondary">
+
+                                Available on appointment day
+
+                              </span>
+
+                              :
+
+                              appointment.status==="Waiting"
+
+                              ?
+
+                              `${appointment.waitingTime ?? 0} mins`
+
+                              :
+
+                              appointment.status==="In Progress"
+
+                              ?
+
+                              <span className="text-primary fw-bold">
+
+                                Your Turn
+
+                              </span>
+
+                              :
+
+                              appointment.status==="Completed"
+
+                              ?
+
+                              <span className="text-success">
+
+                                Completed
+
+                              </span>
+
+                              :
+
+                              <span className="text-danger">
+
+                                Cancelled
+
+                              </span>
+
+                            }
+
+                          </td>
+
+                          <td>
+
+                            <span
+
+                              className={`badge rounded-pill px-3 py-2
+
+                              ${
+
+                                !appointment.queueStarted
+
+                                ?
+
+                                "bg-secondary"
+
+                                :
+
+                                appointment.status==="Waiting"
+
+                                ?
+
+                                "bg-warning text-dark"
+
+                                :
+
+                                appointment.status==="In Progress"
+
+                                ?
+
+                                "bg-primary"
+
+                                :
+
+                                appointment.status==="Completed"
+
+                                ?
+
+                                "bg-success"
+
+                                :
+
+                                "bg-danger"
+
+                              }
+
+                              `}
+
+                            >
+
+                              {
+
+                                !appointment.queueStarted
+
+                                ?
+
+                                "Scheduled"
+
+                                :
+
+                                appointment.status
+
+                              }
+
+                            </span>
+
+                          </td>
+
+                        </tr>
+
+                      ))
+
+                      :
+
+                      <tr>
+
+                        <td
+
+                          colSpan="6"
+
+                          className="text-center text-muted py-4"
+
+                        >
+
+                          No appointments found.
+
+                        </td>
+
+                      </tr>
+
+                    }
+
+                  </tbody>
+
+                </table>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+      <style>
+
+        {`
+
+        @keyframes fadeInDown{
+
+          from{
+
+            opacity:0;
+
+            transform:translate(-50%,-50px);
+
+          }
+
+          to{
+
+            opacity:1;
+
+            transform:translate(-50%,0);
+
+          }
+
+        }
+
+        `}
+
+      </style>
+
+    </div>
+
+  );
 
 }
-
->
-
-OK
-
-</button>
-
-
-
-</div>
-
-
-</div>
-
-
-</div>
-
-
-)}
-
-
-
-
-
-
-{/* ======================
-    Header
-====================== */}
-
-
-<div className="d-flex justify-content-between align-items-center mb-4">
-
-
-<div>
-
-
-<h2 className="fw-bold">
-
-Welcome, {user?.name} 👋
-
-</h2>
-
-
-
-<p className="text-muted mb-0">
-
-Patient Dashboard
-
-</p>
-
-
-</div>
-
-
-
-
-<button
-
-className="btn btn-danger px-4"
-
-onClick={handleLogout}
-
->
-
-🚪 Logout
-
-</button>
-
-
-</div>
-
-
-
-
-
-
-{/* ======================
-    Dashboard Cards
-====================== */}
-
-
-<div className="row">
-
-
-
-{/* Total Appointment */}
-
-
-<div className="col-md-3 mb-3">
-
-
-<div className="card shadow border-0 rounded-4 text-center p-3 h-100">
-
-
-<div style={{fontSize:"40px"}}>
-
-📅
-
-</div>
-
-
-<h6 className="mt-2">
-
-Total Appointments
-
-</h6>
-
-
-
-<h2 className="fw-bold text-primary">
-
-{appointments.length}
-
-</h2>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-{/* Current Status */}
-
-
-<div className="col-md-3 mb-3">
-
-
-<div className="card shadow border-0 rounded-4 text-center p-3 h-100">
-
-
-<div style={{fontSize:"40px"}}>
-
-📋
-
-</div>
-
-
-
-<h6 className="mt-2">
-
-Current Status
-
-</h6>
-
-
-
-
-<h5 className="fw-bold">
-
-
-{
-
-currentAppointment
-
-?
-
-currentAppointment.status
-
-:
-
-"No Active Appointment"
-
-}
-
-
-</h5>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-{/* My Token */}
-
-
-<div className="col-md-2 mb-3">
-
-
-<div className="card shadow border-0 rounded-4 text-center p-3 h-100">
-
-
-<div style={{fontSize:"40px"}}>
-
-🎫
-
-</div>
-
-
-
-<h6 className="mt-2">
-
-My Token
-
-</h6>
-
-
-
-<h2 className="fw-bold text-danger">
-
-
-{
-
-currentAppointment
-
-?
-
-currentAppointment.token
-
-:
-
-"-"
-
-}
-
-
-</h2>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-{/* Patients Ahead */}
-
-
-<div className="col-md-2 mb-3">
-
-
-<div className="card shadow border-0 rounded-4 text-center p-3 h-100">
-
-
-<div style={{fontSize:"40px"}}>
-
-👥
-
-</div>
-
-
-
-<h6 className="mt-2">
-
-Patients Ahead
-
-</h6>
-
-
-
-<h2 className="fw-bold text-warning">
-
-{patientsAhead}
-
-</h2>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-
-{/* Estimated Call */}
-
-
-<div className="col-md-2 mb-3">
-
-
-<div className="card shadow border-0 rounded-4 text-center p-3 h-100">
-
-
-<div style={{fontSize:"40px"}}>
-
-⏱️
-
-</div>
-
-
-
-<h6 className="mt-2">
-
-Estimated Call
-
-</h6>
-
-
-
-
-<h5 className="fw-bold text-success">
-
-
-{
-
-currentAppointment &&
-
-currentAppointment.status==="Waiting"
-
-?
-
-getEstimatedTime(
-currentAppointment.waitingTime
-)
-
-:
-
-"-"
-
-}
-
-
-</h5>
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-</div>
-{/* ======================
-    Main Content
-====================== */}
-
-
-<div className="row mt-5">
-
-
-
-{/* ======================
-    Book Appointment
-====================== */}
-
-
-<div className="col-lg-5 mb-4">
-
-
-<BookAppointment
-
-onBookingSuccess={fetchAppointments}
-
-/>
-
-
-</div>
-
-
-
-
-
-
-
-{/* ======================
-    Appointment Table
-====================== */}
-
-
-
-<div className="col-lg-7">
-
-
-<div className="card shadow-lg border-0 rounded-4">
-
-
-
-<div className="card-header bg-primary text-white">
-
-
-<h4 className="mb-0">
-
-📋 My Appointments
-
-</h4>
-
-
-</div>
-
-
-
-
-
-
-<div className="card-body">
-
-
-<div className="table-responsive">
-
-
-
-<table className="table table-hover align-middle">
-
-
-
-<thead className="table-dark">
-
-
-<tr>
-
-
-<th>
-
-Doctor
-
-</th>
-
-
-<th>
-
-Date
-
-</th>
-
-
-<th>
-
-Token
-
-</th>
-
-
-<th>
-
-Waiting
-
-</th>
-
-
-<th>
-
-Status
-
-</th>
-
-
-</tr>
-
-
-</thead>
-
-
-
-
-
-
-
-<tbody>
-
-
-{
-
-appointments.length > 0 ?
-
-
-appointments.map((appointment)=>(
-
-
-<tr key={appointment._id}>
-
-
-<td>
-
-👨‍⚕️ {appointment.doctor}
-
-</td>
-
-
-
-
-<td>
-
-{appointment.date}
-
-</td>
-
-
-
-
-
-<td>
-
-
-<span className="badge bg-primary">
-
-#{appointment.token}
-
-</span>
-
-
-</td>
-
-
-
-
-
-<td>
-
-
-{
-
-appointment.status==="Waiting"
-
-
-?
-
-`${appointment.waitingTime} min`
-
-
-:
-
-"-"
-
-
-}
-
-
-</td>
-
-
-
-
-
-
-<td>
-
-
-<span
-
-
-className={`badge rounded-pill px-3 py-2
-
-
-${
-
-appointment.status==="Waiting"
-
-?
-
-"bg-warning text-dark"
-
-
-:
-
-appointment.status==="In Progress"
-
-?
-
-"bg-primary"
-
-
-:
-
-appointment.status==="Completed"
-
-?
-
-"bg-success"
-
-
-:
-
-"bg-danger"
-
-
-}
-
-
-`}
-
-
->
-
-
-{appointment.status}
-
-
-</span>
-
-
-</td>
-
-
-
-
-
-</tr>
-
-
-))
-
-
-
-
-
-:
-
-
-
-<tr>
-
-
-<td
-
-colSpan="5"
-
-className="text-center text-muted"
-
->
-
-
-No appointments yet
-
-
-</td>
-
-
-</tr>
-
-
-}
-
-
-
-</tbody>
-
-
-
-
-
-</table>
-
-
-
-
-</div>
-
-
-</div>
-
-
-
-
-</div>
-
-
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-{/* ======================
-    Animation
-====================== */}
-
-
-
-<style>
-
-
-{`
-
-@keyframes fadeInDown{
-
-
-from{
-
-opacity:0;
-
-transform:translate(-50%,-50px);
-
-}
-
-
-to{
-
-opacity:1;
-
-transform:translate(-50%,0);
-
-}
-
-
-}
-
-
-`}
-
-
-</style>
-
-
-
-
-
-</div>
-
-
-);
-
-}
-
-
-
-
 
 export default PatientDashboard;

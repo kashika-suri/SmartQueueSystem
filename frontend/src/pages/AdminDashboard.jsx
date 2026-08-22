@@ -1,966 +1,480 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import socket from "../socket";
-import AdminAnalytics from "../components/AdminAnalytics";
-import ExportReport from "../components/ExportReport";
+import API from "../api/api";
 
 function AdminDashboard() {
 
   const [appointments, setAppointments] = useState([]);
-  const [doctors, setDoctors] = useState([]);
-  const [patients, setPatients] = useState([]);
 
-  const navigate = useNavigate();
+  const [search, setSearch] = useState("");
 
-  // ======================
-  // Logout
-  // ======================
+  const [statusFilter, setStatusFilter] = useState("All");
 
-  const handleLogout = () => {
+  const fetchAppointments = async()=>{
 
-    localStorage.clear();
+    try{
 
-    navigate("/login");
+      const response = await API.get(
 
-  };
+        "/appointments"
 
-  // ======================
-  // Fetch Appointments
-  // ======================
-
-  const fetchAppointments = async () => {
-
-    try {
-
-      const response = await fetch(
-        "https://smartqueuesystem-production.up.railway.app/api/appointments"
       );
 
-      const data = await response.json();
+      setAppointments(
 
-      setAppointments(data);
+        response.data
 
-    } catch (error) {
+      );
 
-      console.log(error);
+    }
+
+    catch(err){
+
+      console.log(err);
 
     }
 
   };
 
-  // ======================
-  // Fetch Doctors
-  // ======================
-
-  const fetchDoctors = async () => {
-
-    try {
-
-      const response = await fetch(
-        "https://smartqueuesystem-production.up.railway.app/api/doctors"
-      );
-
-      const data = await response.json();
-
-      setDoctors(data);
-
-    } catch (error) {
-
-      console.log(error);
-
-    }
-
-  };
-
-  // ======================
-  // Fetch Patients
-  // ======================
-
-  const fetchPatients = async () => {
-
-    try {
-
-      const response = await fetch(
-        "https://smartqueuesystem-production.up.railway.app/api/auth/patients"
-      );
-
-      const data = await response.json();
-
-      setPatients(data);
-
-    } catch (error) {
-
-      console.log(error);
-
-    }
-
-  };
-
-  // ======================
-  // Live Updates
-  // ======================
-
-  useEffect(() => {
+  useEffect(()=>{
 
     fetchAppointments();
-    fetchDoctors();
-    fetchPatients();
 
-    const refreshDashboard = () => {
+    socket.on(
 
-      fetchAppointments();
+      "appointmentBooked",
+
+      fetchAppointments
+
+    );
+
+    socket.on(
+
+      "statusUpdated",
+
+      fetchAppointments
+
+    );
+
+    return ()=>{
+
+      socket.off(
+
+        "appointmentBooked",
+
+        fetchAppointments
+
+      );
+
+      socket.off(
+
+        "statusUpdated",
+
+        fetchAppointments
+
+      );
 
     };
 
-    socket.on("appointmentBooked", refreshDashboard);
-    socket.on("statusUpdated", refreshDashboard);
+  },[]);
 
-    return () => {
+  const filteredAppointments = appointments.filter(
 
-      socket.off("appointmentBooked", refreshDashboard);
-      socket.off("statusUpdated", refreshDashboard);
+    (appointment)=>{
 
-    };
+      const patientName =
 
-  }, []);
+        appointment.patient?.name?.toLowerCase() || "";
 
-  // ======================
-  // Statistics
-  // ======================
+      const doctorName =
 
-  const waiting = appointments.filter(
-    a => a.status === "Waiting"
-  ).length;
+        appointment.doctor.toLowerCase();
 
-  const inProgress = appointments.filter(
-    a => a.status === "In Progress"
-  ).length;
+      const keyword =
 
-  const completed = appointments.filter(
-    a => a.status === "Completed"
-  ).length;
+        search.toLowerCase();
 
-  const cancelled = appointments.filter(
-    a => a.status === "Cancelled"
-  ).length;
+      const matchSearch =
 
-  const currentPatient = appointments.find(
-    a => a.status === "In Progress"
+        patientName.includes(keyword) ||
+
+        doctorName.includes(keyword);
+
+      const matchStatus =
+
+        statusFilter==="All"
+
+        ||
+
+        appointment.status===statusFilter;
+
+      return matchSearch && matchStatus;
+
+    }
+
   );
 
-  const nextPatient = appointments
-    .filter(a => a.status === "Waiting")
-    .sort((a, b) => a.token - b.token)[0];
+  return(
 
-  const averageWaiting =
-    appointments.length > 0
-      ? Math.round(
-          appointments.reduce(
-            (sum, a) => sum + (a.waitingTime || 0),
-            0
-          ) / appointments.length
-        )
-      : 0;
+    <div className="container mt-5">
 
-  return (
+      <h2 className="text-center text-primary mb-4">
 
-    <div className="container-fluid bg-light py-4">
+        📊 Admin Dashboard
 
-      <div className="container">
+      </h2>
+            <div className="row mb-4">
 
-        {/* ======================
-            Header
-        ====================== */}
+        <div className="col-md-3">
 
-        <div className="d-flex justify-content-between align-items-center mb-5 flex-wrap">
+          <div className="card shadow border-0 text-center">
 
-          <div>
+            <div className="card-body">
 
-            <h1 className="fw-bold display-5">
-              🏥 Smart Queue Management
-            </h1>
+              <h6>Total Appointments</h6>
 
-            <p className="text-muted fs-5">
-              Hospital Administration Dashboard
-            </p>
+              <h2 className="text-primary">
 
-          </div>
+                {appointments.length}
 
-          <div className="d-flex">
-
-            <ExportReport
-              doctors={doctors.length}
-              patients={patients.length}
-              appointments={appointments.length}
-              waiting={waiting}
-              inProgress={inProgress}
-              completed={completed}
-              cancelled={cancelled}
-              averageWaiting={averageWaiting}
-            />
-
-            <button
-              className="btn btn-outline-danger ms-2"
-              onClick={handleLogout}
-            >
-              🚪 Logout
-            </button>
-
-          </div>
-
-        </div>
-
-        <AdminAnalytics />
-
-        {/* ======================
-            Dashboard Cards
-        ====================== */}
-        <div className="row g-4 mb-5">
-
-  {/* Doctors */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow-lg rounded-4 bg-primary text-white h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          👨‍⚕️
-        </div>
-
-        <h6 className="mt-3">
-          Doctors
-        </h6>
-
-        <h2 className="fw-bold">
-          {doctors.length}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Patients */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow-lg rounded-4 bg-success text-white h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          🧑
-        </div>
-
-        <h6 className="mt-3">
-          Patients
-        </h6>
-
-        <h2 className="fw-bold">
-          {patients.length}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Appointments */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow-lg rounded-4 bg-warning h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          📅
-        </div>
-
-        <h6 className="mt-3">
-          Appointments
-        </h6>
-
-        <h2 className="fw-bold">
-          {appointments.length}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Waiting */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow-lg rounded-4 bg-danger text-white h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          ⏳
-        </div>
-
-        <h6 className="mt-3">
-          Waiting
-        </h6>
-
-        <h2 className="fw-bold">
-          {waiting}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* In Progress */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow rounded-4 h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          🩺
-        </div>
-
-        <h6 className="mt-3">
-          In Progress
-        </h6>
-
-        <h2 className="text-primary fw-bold">
-          {inProgress}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Completed */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow rounded-4 h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          ✅
-        </div>
-
-        <h6 className="mt-3">
-          Completed
-        </h6>
-
-        <h2 className="text-success fw-bold">
-          {completed}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Cancelled */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow rounded-4 h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          ❌
-        </div>
-
-        <h6 className="mt-3">
-          Cancelled
-        </h6>
-
-        <h2 className="text-danger fw-bold">
-          {cancelled}
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-  {/* Average Waiting */}
-
-  <div className="col-lg-3 col-md-6">
-
-    <div className="card border-0 shadow rounded-4 h-100">
-
-      <div className="card-body text-center">
-
-        <div style={{ fontSize: "45px" }}>
-          ⏱️
-        </div>
-
-        <h6 className="mt-3">
-          Avg Waiting
-        </h6>
-
-        <h2 className="text-warning fw-bold">
-          {averageWaiting} min
-        </h2>
-
-      </div>
-
-    </div>
-
-  </div>
-
-</div>
-
-{/* ======================
-    Live Queue Status
-====================== */}
-
-<div className="row g-4 mb-5">
-
-  {/* Current Patient */}
-
-  <div className="col-lg-6">
-
-    <div className="card border-0 shadow-lg rounded-4 h-100">
-
-      <div className="card-header bg-success text-white rounded-top-4">
-
-        <h4 className="mb-0">
-          🩺 Current Patient
-        </h4>
-
-      </div>
-
-      <div className="card-body text-center">
-
-        {
-
-          currentPatient ?
-
-          <>
-
-            <div
-              className="rounded-circle bg-success text-white mx-auto mb-3 d-flex align-items-center justify-content-center"
-              style={{
-                width: 90,
-                height: 90,
-                fontSize: "40px"
-              }}
-            >
-
-              👤
+              </h2>
 
             </div>
 
-            <h2 className="fw-bold">
-              {currentPatient.patient?.name}
-            </h2>
-
-            <hr />
-
-            <h5>
-              👨‍⚕️ {currentPatient.doctor}
-            </h5>
-
-            <h3 className="text-danger mt-3">
-              Token #{currentPatient.token}
-            </h3>
-
-            <span className="badge bg-success fs-6 mt-3">
-              Currently Being Served
-            </span>
-
-          </>
-
-          :
-
-          <div className="py-5">
-
-            <h2>😴</h2>
-
-            <h4 className="text-muted">
-              No Patient Being Served
-            </h4>
-
           </div>
 
-        }
+        </div>
 
-      </div>
+        <div className="col-md-3">
 
-    </div>
+          <div className="card shadow border-0 text-center">
 
-  </div>
+            <div className="card-body">
 
-  {/* Next Patient */}
+              <h6>Waiting</h6>
 
-  <div className="col-lg-6">
+              <h2 className="text-warning">
 
-    <div className="card border-0 shadow-lg rounded-4 h-100">
+                {
 
-      <div className="card-header bg-warning rounded-top-4">
+                  appointments.filter(
 
-        <h4 className="mb-0">
-          ⏭ Next Patient
-        </h4>
+                    appointment=>appointment.status==="Waiting"
 
-      </div>
+                  ).length
 
-      <div className="card-body text-center">
+                }
 
-        {
-
-          nextPatient ?
-
-          <>
-
-            <div
-              className="rounded-circle bg-warning mx-auto mb-3 d-flex align-items-center justify-content-center"
-              style={{
-                width: 90,
-                height: 90,
-                fontSize: "40px"
-              }}
-            >
-
-              ⏳
+              </h2>
 
             </div>
 
-            <h2 className="fw-bold">
-              {nextPatient.patient?.name}
-            </h2>
+          </div>
 
-            <hr />
+        </div>
 
-            <h5>
-              👨‍⚕️ {nextPatient.doctor}
-            </h5>
+        <div className="col-md-3">
 
-            <h3 className="text-primary mt-3">
-              Token #{nextPatient.token}
-            </h3>
+          <div className="card shadow border-0 text-center">
 
-            <span className="badge bg-warning text-dark fs-6 mt-3">
-              Waiting
-            </span>
+            <div className="card-body">
 
-          </>
+              <h6>In Progress</h6>
 
-          :
+              <h2 className="text-primary">
 
-          <div className="py-5">
+                {
 
-            <h2>🎉</h2>
+                  appointments.filter(
 
-            <h4 className="text-muted">
-              Queue Empty
-            </h4>
+                    appointment=>appointment.status==="In Progress"
+
+                  ).length
+
+                }
+
+              </h2>
+
+            </div>
 
           </div>
 
-        }
+        </div>
+
+        <div className="col-md-3">
+
+          <div className="card shadow border-0 text-center">
+
+            <div className="card-body">
+
+              <h6>Completed</h6>
+
+              <h2 className="text-success">
+
+                {
+
+                  appointments.filter(
+
+                    appointment=>appointment.status==="Completed"
+
+                  ).length
+
+                }
+
+              </h2>
+
+            </div>
+
+          </div>
+
+        </div>
 
       </div>
 
-    </div>
+      <div className="card shadow-lg">
 
-  </div>
+        <div className="card-body">
 
-</div>
-{/* ======================
-    Appointment Management
-====================== */}
+          <div className="row mb-3">
 
-<div className="card border-0 shadow-lg rounded-4 mb-5">
+            <div className="col-md-8">
 
-  <div className="card-header bg-dark text-white rounded-top-4">
+              <input
 
-    <h4 className="mb-0">
-      📋 Appointment Management
-    </h4>
+                type="text"
 
-  </div>
+                className="form-control"
 
-  <div className="card-body">
+                placeholder="Search Patient or Doctor"
 
-    <div className="table-responsive">
+                value={search}
 
-      <table className="table table-hover align-middle">
+                onChange={(e)=>setSearch(
 
-        <thead className="table-light">
+                  e.target.value
 
-          <tr>
+                )}
 
-            <th>Queue</th>
+              />
 
-            <th>Token</th>
+            </div>
 
-            <th>Patient</th>
+            <div className="col-md-4">
 
-            <th>Doctor</th>
+              <select
 
-            <th>Date</th>
+                className="form-select"
 
-            <th>Status</th>
+                value={statusFilter}
 
-            <th>Waiting Time</th>
+                onChange={(e)=>setStatusFilter(
 
-          </tr>
+                  e.target.value
 
-        </thead>
+                )}
 
-        <tbody>
-
-          {
-
-            appointments.length > 0 ?
-
-            appointments.map((appointment) => (
-
-              <tr key={appointment._id}>
-
-                <td>
-
-                  <span className="badge bg-secondary">
-
-                    {appointment.queuePosition}
-
-                  </span>
-
-                </td>
-
-                <td>
-
-                  <span className="badge bg-primary">
-
-                    #{appointment.token}
-
-                  </span>
-
-                </td>
-
-                <td>
-
-                  {appointment.patient?.name || "Unknown"}
-
-                </td>
-
-                <td>
-
-                  {appointment.doctor}
-
-                </td>
-
-                <td>
-
-                  {appointment.date}
-
-                </td>
-
-                <td>
-
-                  {
-
-                    appointment.status === "Waiting" &&
-
-                    <span className="badge bg-warning text-dark">
-
-                      Waiting
-
-                    </span>
-
-                  }
-
-                  {
-
-                    appointment.status === "In Progress" &&
-
-                    <span className="badge bg-success">
-
-                      In Progress
-
-                    </span>
-
-                  }
-
-                  {
-
-                    appointment.status === "Completed" &&
-
-                    <span className="badge bg-primary">
-
-                      Completed
-
-                    </span>
-
-                  }
-
-                  {
-
-                    appointment.status === "Cancelled" &&
-
-                    <span className="badge bg-danger">
-
-                      Cancelled
-
-                    </span>
-
-                  }
-
-                </td>
-
-                <td>
-
-                  {appointment.waitingTime || 0} min
-
-                </td>
-
-              </tr>
-
-            ))
-
-            :
-
-            <tr>
-
-              <td
-                colSpan="7"
-                className="text-center"
               >
 
-                No Appointments Found
+                <option value="All">
 
-              </td>
+                  All Status
 
-            </tr>
+                </option>
 
-          }
+                <option value="Waiting">
 
-        </tbody>
+                  Waiting
 
-      </table>
+                </option>
 
-    </div>
+                <option value="In Progress">
 
-  </div>
+                  In Progress
 
-</div>
-{/* ======================
-    Doctor Overview
-====================== */}
+                </option>
 
-<div className="card border-0 shadow-lg rounded-4 mb-5">
+                <option value="Completed">
 
-  <div className="card-header bg-primary text-white rounded-top-4">
+                  Completed
 
-    <h4 className="mb-0">
-      👨‍⚕️ Doctor Overview
-    </h4>
+                </option>
 
-  </div>
+                <option value="Cancelled">
 
-  <div className="card-body">
+                  Cancelled
 
-    <div className="row g-4">
+                </option>
 
-      {
-
-        doctors.map((doctor) => {
-
-          const totalAppointments = appointments.filter(
-            (a) => a.doctor === doctor.name
-          ).length;
-
-          const activeAppointments = appointments.filter(
-            (a) =>
-              a.doctor === doctor.name &&
-              a.status === "In Progress"
-          ).length;
-
-          const waitingAppointments = appointments.filter(
-            (a) =>
-              a.doctor === doctor.name &&
-              a.status === "Waiting"
-          ).length;
-
-          return (
-
-            <div
-              className="col-lg-4 col-md-6"
-              key={doctor._id}
-            >
-
-              <div className="card border-0 shadow-sm rounded-4 h-100">
-
-                <div className="card-body text-center">
-
-                  <div style={{ fontSize: "50px" }}>
-                    👨‍⚕️
-                  </div>
-
-                  <h5 className="fw-bold">
-                    {doctor.name}
-                  </h5>
-
-                  <p className="text-muted">
-
-                    {doctor.specialization || "General Physician"}
-
-                  </p>
-
-                  <hr />
-
-                  <div className="row">
-
-                    <div className="col-4">
-
-                      <h6 className="text-primary">
-                        {totalAppointments}
-                      </h6>
-
-                      <small>Total</small>
-
-                    </div>
-
-                    <div className="col-4">
-
-                      <h6 className="text-success">
-                        {activeAppointments}
-                      </h6>
-
-                      <small>Serving</small>
-
-                    </div>
-
-                    <div className="col-4">
-
-                      <h6 className="text-warning">
-                        {waitingAppointments}
-                      </h6>
-
-                      <small>Waiting</small>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-              </div>
+              </select>
 
             </div>
 
-          );
+          </div>
 
-        })
+          <div className="table-responsive">
 
-      }
+            <table className="table table-hover align-middle">
 
-    </div>
+              <thead className="table-dark">
 
-  </div>
+                <tr>
 
-</div>
+                  <th>Token</th>
 
-{/* ======================
-    Patient Overview
-====================== */}
+                  <th>Patient</th>
 
-<div className="card border-0 shadow-lg rounded-4 mb-5">
+                  <th>Doctor</th>
 
-  <div className="card-header bg-success text-white rounded-top-4">
+                  <th>Date</th>
 
-    <h4 className="mb-0">
-      🧑 Registered Patients
-    </h4>
+                  <th>Time Slot</th>
 
-  </div>
+                  <th>Status</th>
 
-  <div className="card-body">
+                </tr>
 
-    <div className="row g-4">
+              </thead>
 
-      {
+              <tbody>
+                              {
 
-        patients.map((patient) => {
+                filteredAppointments.length > 0
 
-          const totalAppointments = appointments.filter(
-            (a) => a.patient?._id === patient._id
-          ).length;
+                ?
 
-          return (
+                filteredAppointments.map((appointment)=>(
 
-            <div
-              className="col-lg-3 col-md-6"
-              key={patient._id}
-            >
+                  <tr key={appointment._id}>
 
-              <div className="card border-0 shadow-sm rounded-4 h-100">
+                    <td>
 
-                <div className="card-body text-center">
+                      <span className="badge bg-primary">
 
-                  <div style={{ fontSize: "45px" }}>
-                    🧑
-                  </div>
+                        #{appointment.token}
 
-                  <h6 className="fw-bold mt-2">
-                    {patient.name}
-                  </h6>
+                      </span>
 
-                  <p className="text-muted small">
+                    </td>
 
-                    {patient.email}
+                    <td>
 
-                  </p>
+                      <div>
 
-                  <hr />
+                        <h6 className="mb-0">
 
-                  <h5 className="text-primary">
+                          {appointment.patient?.name}
 
-                    {totalAppointments}
+                        </h6>
 
-                  </h5>
+                        <small className="text-muted">
 
-                  <small>
+                          {appointment.patient?.email}
 
-                    Total Appointments
+                        </small>
 
-                  </small>
+                      </div>
 
-                </div>
+                    </td>
 
-              </div>
+                    <td>
 
-            </div>
+                      👨‍⚕️ {appointment.doctor}
 
-          );
+                    </td>
 
-        })
+                    <td>
 
-      }
+                      {appointment.date}
 
-    </div>
+                    </td>
 
-  </div>
+                    <td>
 
-</div>
+                      🕒 {appointment.slot}
+
+                    </td>
+
+                    <td>
+
+                      <span
+
+                        className={`badge px-3 py-2
+
+                        ${
+
+                          appointment.status==="Waiting"
+
+                          ?
+
+                          "bg-warning text-dark"
+
+                          :
+
+                          appointment.status==="In Progress"
+
+                          ?
+
+                          "bg-primary"
+
+                          :
+
+                          appointment.status==="Completed"
+
+                          ?
+
+                          "bg-success"
+
+                          :
+
+                          "bg-danger"
+
+                        }
+
+                        `}
+
+                      >
+
+                        {appointment.status}
+
+                      </span>
+
+                    </td>
+
+                  </tr>
+
+                ))
+
+                :
+
+                <tr>
+
+                  <td
+
+                    colSpan="6"
+
+                    className="text-center text-muted py-5"
+
+                  >
+
+                    <h5>
+
+                      No Appointments Found
+
+                    </h5>
+
+                  </td>
+
+                </tr>
+
+              }
+                            </tbody>
+
+            </table>
+
+          </div>
+
+        </div>
+
       </div>
 
     </div>

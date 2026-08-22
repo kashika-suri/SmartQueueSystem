@@ -1,1313 +1,709 @@
 const Appointment = require("../models/Appointment");
 
-
-
 // ======================
 // Book Appointment
 // ======================
 
-const bookAppointment = async(req,res)=>{
+const bookAppointment = async (req, res) => {
 
+  try {
 
-try{
+    const {
 
+      patient,
 
-const {
+      doctor,
 
-patient,
+      date,
 
-doctor,
+      slot
 
-date
+    } = req.body;
 
-}=req.body;
+    const lastAppointment = await Appointment.findOne({
 
+      doctor,
 
+      date,
 
+      slot
 
-const lastAppointment = await Appointment.findOne({
+    }).sort({
 
-doctor,
+      token: -1
 
-date
+    });
 
-})
+    const token = lastAppointment
 
-.sort({
+      ? lastAppointment.token + 1
 
-token:-1
+      : 1;
 
-});
+    const queuePosition = token;
 
+    const today = new Date();
 
+    const appointmentDate = new Date(date);
 
+    today.setHours(
 
-const token = lastAppointment
+      0,
 
-? lastAppointment.token + 1
+      0,
 
-: 1;
+      0,
 
+      0
 
+    );
 
-const queuePosition = token;
+    appointmentDate.setHours(
 
+      0,
 
+      0,
 
+      0,
 
-// ======================
-// Queue Logic
-// ======================
+      0
 
+    );
 
-const today = new Date();
+    let waitingTime = null;
 
-const appointmentDate = new Date(date);
+    let queueStarted = false;
 
+    let queueStatus = "Scheduled";
 
+    if (
 
-today.setHours(
-0,
-0,
-0,
-0
-);
+      appointmentDate.getTime() ===
 
+      today.getTime()
 
-appointmentDate.setHours(
-0,
-0,
-0,
-0
-);
+    ) {
 
+      waitingTime =
 
+        (queuePosition - 1) * 10;
 
+      queueStarted = true;
 
-let waitingTime = null;
+      queueStatus = "Running";
 
-let queueStarted = false;
+    }
 
-let queueStatus = "Scheduled";
+    const appointment = new Appointment({
 
+      patient,
 
+      doctor,
 
+      date,
 
+      slot,
 
-if(
-appointmentDate.getTime()
-===
-today.getTime()
-){
+      token,
 
+      queuePosition,
 
-waitingTime =
+      waitingTime,
 
-(queuePosition - 1) * 10;
+      queueStarted,
 
+      queueStatus
 
-queueStarted = true;
+    });
 
+    await appointment.save();
 
-queueStatus = "Running";
+    const io = req.app.get("io");
 
+    if (io) {
 
-}
+      io.emit(
 
-else{
+        "appointmentBooked",
 
+        appointment
 
-waitingTime = null;
+      );
 
+    }
 
-queueStarted = false;
+    res.status(201).json({
 
+      message: "Appointment Booked Successfully",
 
-queueStatus = "Scheduled";
+      appointment
 
+    });
 
-}
+  }
 
+  catch (err) {
 
+    console.log(err);
 
+    res.status(500).json({
 
+      message: err.message
 
+    });
 
-const appointment = new Appointment({
-
-patient,
-
-doctor,
-
-date,
-
-token,
-
-queuePosition,
-
-waitingTime,
-
-queueStarted,
-
-queueStatus
-
-});
-
-
-
-
-
-await appointment.save();
-
-
-
-
-
-const io = req.app.get("io");
-
-
-
-console.log("✅ Appointment Booked");
-
-console.log("Patient:",patient);
-
-console.log("Doctor:",doctor);
-
-console.log("Token:",token);
-
-
-
-
-if(io){
-
-io.emit(
-
-"appointmentBooked",
-
-appointment
-
-);
-
-}
-
-
-
-
-
-res.status(201).json({
-
-message:
-"Appointment Booked Successfully",
-
-appointment,
-
-queuePosition,
-
-waitingTime,
-
-queueStarted,
-
-queueStatus
-
-});
-
-
-
-}
-
-
-catch(err){
-
-
-console.log(err);
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
+  }
 
 };
 // ======================
 // Get All Appointments
 // ======================
 
-const getAppointments = async(req,res)=>{
+const getAppointments = async (req, res) => {
 
+  try {
 
-try{
+    const appointments = await Appointment.find()
 
+      .populate(
 
-const appointments = await Appointment.find()
+        "patient",
 
+        "name email"
 
-.populate(
+      )
 
-"patient",
+      .sort({
 
-"name email"
+        date: 1,
 
-)
+        slot: 1,
 
+        doctor: 1,
 
-.sort({
+        token: 1
 
-date:1,
+      });
 
-doctor:1,
+    res.json(
 
-token:1
+      appointments
 
-});
+    );
 
+  }
 
+  catch (err) {
 
-res.json(appointments);
+    console.log(err);
 
+    res.status(500).json({
 
+      message: err.message
 
-}
+    });
 
-
-catch(err){
-
-
-console.log(err);
-
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
-
+  }
 
 };
-
-
-
-
-
-
-
-
 
 // ======================
 // Get Patient Appointments
 // ======================
 
+const getPatientAppointments = async (req, res) => {
 
-const getPatientAppointments = async(req,res)=>{
+  try {
 
+    const appointments = await Appointment.find({
 
-try{
+      patient: req.params.id
 
+    })
 
-const appointments = await Appointment.find({
+      .populate(
 
+        "patient",
 
-patient:req.params.id
+        "name email"
 
+      )
 
-})
+      .sort({
 
+        date: 1,
 
-.populate(
+        slot: 1,
 
-"patient",
+        token: 1
 
-"name email"
+      });
 
-)
+    const today = new Date();
 
+    today.setHours(
 
-.sort({
+      0,
 
-date:1,
+      0,
 
-token:1
+      0,
 
-});
+      0
 
+    );
 
+    const updatedAppointments = appointments.map(
 
+      (appointment) => {
 
+        const appointmentObj = appointment.toObject();
 
+        const appointmentDate = new Date(
 
+          appointment.date
 
-const today = new Date();
+        );
 
+        appointmentDate.setHours(
 
-today.setHours(
+          0,
 
-0,
+          0,
 
-0,
+          0,
 
-0,
+          0
 
-0
+        );
 
-);
+        if (appointmentDate > today) {
 
+          appointmentObj.queueStarted = false;
 
+          appointmentObj.queueStatus = "Scheduled";
 
+          appointmentObj.waitingTime = null;
 
+          appointmentObj.patientsAhead = null;
 
+        }
 
+        else if (
 
+          appointmentDate.getTime() ===
 
-const updatedAppointments = appointments.map(
+          today.getTime()
 
-(appointment)=>{
+        ) {
 
+          appointmentObj.queueStarted = true;
 
-const appointmentObj =
-appointment.toObject();
+          appointmentObj.queueStatus = "Running";
 
+          if (
 
+            appointmentObj.status === "Waiting"
 
+          ) {
 
-const appointmentDate =
-new Date(
+            const patientsAhead = appointments.filter(
 
-appointment.date
+              (item) =>
 
-);
+                item.doctor === appointment.doctor &&
 
+                item.date === appointment.date &&
 
+                item.slot === appointment.slot &&
 
-appointmentDate.setHours(
+                item.status === "Waiting" &&
 
-0,
+                item.token < appointment.token
 
-0,
+            ).length;
 
-0,
+            appointmentObj.patientsAhead = patientsAhead;
 
-0
+            appointmentObj.waitingTime =
 
-);
+              patientsAhead * 10;
 
+          }
 
+        }
 
+        else {
 
+          appointmentObj.queueStarted = false;
 
+          appointmentObj.queueStatus = "Completed";
 
+          appointmentObj.waitingTime = null;
 
-// ======================
-// Future Appointment
-// ======================
+        }
 
+        return appointmentObj;
 
-if(
-appointmentDate > today
-){
+      }
 
+    );
 
-appointmentObj.queueStarted = false;
+    res.json(
 
+      updatedAppointments
 
-appointmentObj.queueStatus =
-"Scheduled";
+    );
 
+  }
 
-appointmentObj.waitingTime = null;
+  catch (err) {
 
+    console.log(err);
 
-appointmentObj.patientsAhead = null;
+    res.status(500).json({
 
+      message: err.message
 
-appointmentObj.estimatedMessage =
-"Available on appointment day";
+    });
 
-
-}
-
-
-
-
-
-
-
-// ======================
-// Appointment Day
-// ======================
-
-
-else if(
-
-appointmentDate.getTime()
-
-===
-
-today.getTime()
-
-){
-
-
-
-appointmentObj.queueStarted = true;
-
-
-appointmentObj.queueStatus =
-"Running";
-
-
-
-
-
-if(
-appointmentObj.status === "Waiting"
-){
-
-
-const patientsAhead =
-
-appointments.filter(
-
-(item)=>
-
-
-item.doctor === appointment.doctor &&
-
-
-item.date === appointment.date &&
-
-
-item.status === "Waiting" &&
-
-
-item.token < appointment.token
-
-
-).length;
-
-
-
-
-
-appointmentObj.patientsAhead =
-patientsAhead;
-
-
-appointmentObj.waitingTime =
-patientsAhead * 10;
-
-
-}
-
-
-
-appointmentObj.estimatedMessage =
-
-appointmentObj.waitingTime
-
-?
-
-`${appointmentObj.waitingTime} minutes`
-
-:
-
-"Your turn is next";
-
-
-
-}
-
-
-
-
-
-
-
-
-// ======================
-// Past Appointment
-// ======================
-
-
-else{
-
-
-appointmentObj.queueStarted = false;
-
-
-appointmentObj.queueStatus =
-"Completed";
-
-
-appointmentObj.waitingTime = null;
-
-
-appointmentObj.estimatedMessage =
-"Completed";
-
-
-}
-
-
-
-return appointmentObj;
-
-
-
-}
-
-);
-
-
-
-
-
-
-
-res.json(updatedAppointments);
-
-
-
-}
-
-
-catch(err){
-
-
-console.log(err);
-
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
-
+  }
 
 };
 // ======================
 // Get Doctor Appointments
 // ======================
 
+const getDoctorAppointments = async (req, res) => {
 
-const getDoctorAppointments = async(req,res)=>{
+  try {
 
+    const appointments = await Appointment.find({
 
-try{
+      doctor: req.params.name
 
+    })
 
-const appointments = await Appointment.find({
+      .populate(
 
+        "patient",
 
-doctor:req.params.name
+        "name email"
 
+      )
 
-})
+      .sort({
 
+        date: 1,
 
-.populate(
+        slot: 1,
 
-"patient",
+        token: 1
 
-"name email"
+      });
 
-)
+    res.json(
 
+      appointments
 
-.sort({
+    );
 
-token:1
+  }
 
-});
+  catch (err) {
 
+    console.log(err);
 
+    res.status(500).json({
 
+      message: err.message
 
+    });
 
-res.json(appointments);
-
-
-
-}
-
-
-catch(err){
-
-
-console.log(err);
-
-
-
-res.status(500).json({
-
-message:err.message
-
-});
-
-
-}
-
-
+  }
 
 };
-
-
-
-
-
-
-
 
 // ======================
 // Update Appointment Status
 // ======================
 
+const updateAppointmentStatus = async (req, res) => {
 
-const updateAppointmentStatus = async(req,res)=>{
+  try {
 
+    const { status } = req.body;
 
-try{
+    let appointment = await Appointment.findByIdAndUpdate(
 
+      req.params.id,
 
-const {status} = req.body;
+      {
 
+        status
 
+      },
 
-console.log(
-"\n=============================="
-);
+      {
 
+        new: true
 
-console.log(
-"📌 Update Status Request"
-);
+      }
 
+    );
 
-console.log(
-"Appointment ID:",
-req.params.id
-);
+    if (!appointment) {
 
+      return res.status(404).json({
 
-console.log(
-"New Status:",
-status
-);
+        message: "Appointment not found"
 
+      });
 
-console.log(
-"=============================="
-);
+    }
 
+    const io = req.app.get("io");
 
+    if (
 
+      status === "In Progress"
 
+    ) {
 
-let appointment =
+      if (io) {
 
-await Appointment.findByIdAndUpdate(
+        io.to(
 
+          appointment.patient.toString()
 
-req.params.id,
+        ).emit(
 
+          "yourTurn",
 
-{
+          {
 
-status
+            message: "Your turn has arrived!",
 
-},
+            doctor: appointment.doctor,
 
+            token: appointment.token,
 
-{
+            slot: appointment.slot,
 
-new:true
+            appointmentId: appointment._id
 
-}
+          }
 
+        );
 
-);
+      }
 
+    }
 
+    if (
 
+      status === "Completed" ||
 
+      status === "Cancelled"
 
+    ) {
 
+      const nextPatient = await Appointment.findOne({
 
-if(!appointment){
+        doctor: appointment.doctor,
 
+        date: appointment.date,
 
-return res.status(404).json({
+        slot: appointment.slot,
 
-message:
+        status: "Waiting"
 
-"Appointment not found"
+      })
 
-});
+      .sort({
 
+        token: 1
 
-}
+      });
+            if (nextPatient) {
 
+        nextPatient.status = "In Progress";
 
+        await nextPatient.save();
 
+        if (io) {
 
+          io.to(
 
+            nextPatient.patient.toString()
 
+          ).emit(
 
-const io = req.app.get("io");
+            "yourTurn",
 
+            {
 
+              message: "Your turn has arrived!",
 
+              doctor: nextPatient.doctor,
 
+              token: nextPatient.token,
 
+              slot: nextPatient.slot,
 
-console.log(
-"✅ Appointment Updated"
-);
+              appointmentId: nextPatient._id
 
+            }
 
-console.log(
-"Patient:",
-appointment.patient.toString()
-);
+          );
 
+        }
 
-console.log(
-"Doctor:",
-appointment.doctor
-);
+      }
 
+    }
 
-console.log(
-"Token:",
-appointment.token
-);
+    const waitingAppointments = await Appointment.find({
 
+      doctor: appointment.doctor,
 
+      date: appointment.date,
 
+      slot: appointment.slot,
 
+      status: "Waiting"
 
+    })
 
-// ===============================
-// Your Turn Notification
-// ===============================
+    .sort({
 
+      token: 1
 
-if(status === "In Progress"){
+    });
 
+    const today = new Date();
 
+    today.setHours(
 
-console.log(
-"🔥 YOUR TURN"
-);
+      0,
 
+      0,
 
+      0,
 
+      0
 
-if(io){
+    );
 
+    const appointmentDate = new Date(
 
+      appointment.date
 
-io.to(
+    );
 
-appointment.patient.toString()
+    appointmentDate.setHours(
 
-)
+      0,
 
-.emit(
+      0,
 
-"yourTurn",
+      0,
 
-{
+      0
 
+    );
 
-message:
+    const queueStarted =
 
-"Your turn has arrived!",
+      appointmentDate.getTime() ===
 
+      today.getTime();
 
-doctor:
+    for (
 
-appointment.doctor,
+      let i = 0;
 
+      i < waitingAppointments.length;
 
-token:
+      i++
 
-appointment.token,
+    ) {
 
+      waitingAppointments[i].queuePosition =
 
-appointmentId:
+        i + 1;
 
-appointment._id
+      if (queueStarted) {
 
+        waitingAppointments[i].waitingTime =
 
-}
+          i * 10;
 
-);
+        waitingAppointments[i].queueStarted = true;
 
+        waitingAppointments[i].queueStatus = "Running";
 
+      }
 
-console.log(
-"✅ yourTurn emitted"
-);
+      else {
 
+        waitingAppointments[i].waitingTime = null;
 
+        waitingAppointments[i].queueStarted = false;
 
-}
+        waitingAppointments[i].queueStatus = "Scheduled";
 
+      }
 
+      await waitingAppointments[i].save();
 
-}
+    }
 
-// ===============================
-// Automatic Next Patient
-// ===============================
+    if (io) {
 
+      io.emit(
 
-if(
+        "statusUpdated",
 
-status === "Completed" ||
+        appointment
 
-status === "Cancelled"
+      );
 
-){
+    }
 
+    res.json({
 
+      message: "Status Updated Successfully",
 
-const nextPatient =
+      appointment
 
-await Appointment.findOne({
+    });
 
+  }
 
-doctor:
+  catch (err) {
 
-appointment.doctor,
+    console.log(err);
 
+    res.status(500).json({
 
-date:
+      message: err.message
 
-appointment.date,
+    });
 
-
-status:
-
-"Waiting"
-
-
-})
-
-
-.sort({
-
-token:1
-
-});
-
-
-
-
-
-
-
-if(nextPatient){
-
-
-
-nextPatient.status =
-"In Progress";
-
-
-await nextPatient.save();
-
-
-
-
-
-
-console.log(
-"➡️ Next Patient Started"
-);
-
-
-console.log(
-"Token:",
-nextPatient.token
-);
-
-
-
-
-
-
-if(io){
-
-
-
-io.to(
-
-nextPatient.patient.toString()
-
-)
-
-.emit(
-
-"yourTurn",
-
-{
-
-
-message:
-
-"Your turn has arrived!",
-
-
-doctor:
-
-nextPatient.doctor,
-
-
-token:
-
-nextPatient.token,
-
-
-appointmentId:
-
-nextPatient._id
-
-
-}
-
-);
-
-
-
-console.log(
-"✅ Next Patient Notified"
-);
-
-
-
-}
-
-
-
-}
-
-
-
-}
-
-
-
-
-
-
-
-
-// ===============================
-// Update Queue Positions
-// ===============================
-
-
-const waitingAppointments =
-
-await Appointment.find({
-
-
-doctor:
-
-appointment.doctor,
-
-
-date:
-
-appointment.date,
-
-
-status:
-
-"Waiting"
-
-
-})
-
-
-.sort({
-
-token:1
-
-});
-
-
-
-
-
-
-const today = new Date();
-
-
-today.setHours(
-
-0,
-
-0,
-
-0,
-
-0
-
-);
-
-
-
-
-
-const appointmentDate =
-
-new Date(
-
-appointment.date
-
-);
-
-
-
-appointmentDate.setHours(
-
-0,
-
-0,
-
-0,
-
-0
-
-);
-
-
-
-
-
-
-const queueStarted =
-
-appointmentDate.getTime()
-
-===
-
-today.getTime();
-
-
-
-
-
-
-
-for(
-
-let i=0;
-
-i<waitingAppointments.length;
-
-i++
-
-){
-
-
-
-waitingAppointments[i].queuePosition =
-
-i + 1;
-
-
-
-
-
-
-if(queueStarted){
-
-
-
-waitingAppointments[i].waitingTime =
-
-i * 10;
-
-
-waitingAppointments[i].queueStarted =
-
-true;
-
-
-waitingAppointments[i].queueStatus =
-
-"Running";
-
-
-}
-
-else{
-
-
-waitingAppointments[i].waitingTime =
-
-null;
-
-
-waitingAppointments[i].queueStarted =
-
-false;
-
-
-waitingAppointments[i].queueStatus =
-
-"Scheduled";
-
-
-}
-
-
-
-
-
-
-await waitingAppointments[i].save();
-
-
-
-}
-
-
-
-
-
-console.log(
-"✅ Queue Updated"
-);
-
-// ===============================
-// Notify All Dashboards
-// ===============================
-
-
-if(io){
-
-
-
-io.emit(
-
-"statusUpdated",
-
-appointment
-
-);
-
-
-
-console.log(
-"📢 statusUpdated emitted"
-);
-
-
-
-}
-
-
-
-
-
-
-res.json({
-
-
-message:
-
-"Status Updated Successfully",
-
-
-appointment
-
-
-});
-
-
-
-
-
-}
-
-
-
-catch(err){
-
-
-
-console.log(
-
-"❌ Error:",
-
-err
-
-);
-
-
-
-res.status(500).json({
-
-message:
-
-err.message
-
-});
-
-
-
-}
-
-
+  }
 
 };
-
-
-
-
-
-
-
-
-// ======================
-// Export Controllers
-// ======================
-
-
 module.exports = {
 
+  bookAppointment,
 
-bookAppointment,
+  getAppointments,
 
+  getPatientAppointments,
 
-getAppointments,
+  getDoctorAppointments,
 
-
-getPatientAppointments,
-
-
-getDoctorAppointments,
-
-
-updateAppointmentStatus
-
+  updateAppointmentStatus
 
 };

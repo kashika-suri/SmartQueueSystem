@@ -1,358 +1,448 @@
 import React, { useEffect, useState } from "react";
 import socket from "../socket";
+import API from "../api/api";
 
 function ReceptionistDashboard() {
 
   const [appointments, setAppointments] = useState([]);
+
   const [search, setSearch] = useState("");
+
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // ======================
-  // Fetch Appointments
-  // ======================
+  const fetchAppointments = async()=>{
 
-  const fetchAppointments = async () => {
+    try{
 
-    try {
+      const response = await API.get(
 
-      const response = await fetch(
-        "https://smartqueuesystem-production.up.railway.app/api/appointments"
+        "/appointments"
+
       );
 
-      const data = await response.json();
+      setAppointments(
 
-      setAppointments(data);
+        response.data
 
-    } catch (error) {
+      );
 
-      console.log(error);
+    }
+
+    catch(err){
+
+      console.log(err);
 
     }
 
   };
 
-  // ======================
-  // Initial Load + Socket.IO
-  // ======================
+  useEffect(()=>{
 
-  useEffect(() => {
-
-    // Initial fetch
     fetchAppointments();
 
-    // Listen when a new appointment is booked
-    socket.on("appointmentBooked", () => {
+    socket.on(
 
-      console.log("📢 New appointment booked");
+      "appointmentBooked",
 
-      fetchAppointments();
+      fetchAppointments
 
-    });
+    );
 
-    // Listen when appointment status changes
-    socket.on("statusUpdated", () => {
+    socket.on(
 
-      console.log("📢 Appointment status updated");
+      "statusUpdated",
 
-      fetchAppointments();
+      fetchAppointments
 
-    });
+    );
 
-    // Cleanup
-    return () => {
+    return ()=>{
 
-      socket.off("appointmentBooked");
-      socket.off("statusUpdated");
+      socket.off(
+
+        "appointmentBooked",
+
+        fetchAppointments
+
+      );
+
+      socket.off(
+
+        "statusUpdated",
+
+        fetchAppointments
+
+      );
 
     };
 
-  }, []);
+  },[]);
 
-  // ======================
-  // Update Status
-  // ======================
+  const updateStatus = async(id,status)=>{
 
-  const updateStatus = async (id, status) => {
+    try{
 
-    try {
+      await API.put(
 
-      await fetch(
-        `https://smartqueuesystem-production.up.railway.app/api/appointments/${id}/status`,
+        `/appointments/${id}/status`,
+
         {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            status,
-          }),
+
+          status
+
         }
+
       );
 
-      // No need to call fetchAppointments()
-      // Socket.IO will update automatically
+      fetchAppointments();
 
-    } catch (error) {
+    }
 
-      console.log(error);
+    catch(err){
+
+      console.log(err);
 
     }
 
   };
 
-  // ======================
-  // Search + Filter
-  // ======================
+  const filteredAppointments = appointments.filter(
 
-  const filteredAppointments = appointments.filter((appointment) => {
+    (appointment)=>{
 
-    const matchesSearch =
-      appointment.patient?.name
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+      const patient =
 
-    const matchesStatus =
-      statusFilter === "All"
-        ? true
-        : appointment.status === statusFilter;
+        appointment.patient?.name?.toLowerCase() || "";
 
-    return matchesSearch && matchesStatus;
+      const doctor =
 
-  });
+        appointment.doctor.toLowerCase();
 
-  // ======================
-  // Dashboard Cards
-  // ======================
+      const keyword =
 
-  const waiting = appointments.filter(
-    (a) => a.status === "Waiting"
-  ).length;
+        search.toLowerCase();
 
-  const inProgress = appointments.filter(
-    (a) => a.status === "In Progress"
-  ).length;
+      const matchSearch =
 
-  const completed = appointments.filter(
-    (a) => a.status === "Completed"
-  ).length;
+        patient.includes(keyword) ||
 
-  return (
+        doctor.includes(keyword);
+
+      const matchStatus =
+
+        statusFilter==="All"
+
+        ||
+
+        appointment.status===statusFilter;
+
+      return matchSearch && matchStatus;
+
+    }
+
+  );
+
+  return(
 
     <div className="container mt-5">
 
-      <h2 className="text-success mb-4">
+      <h2 className="text-center text-primary mb-4">
+
         🏥 Receptionist Dashboard
+
       </h2>
+            <div className="card shadow-lg">
 
-      {/* Dashboard Cards */}
+        <div className="card-body">
 
-      <div className="row mb-4">
+          <div className="row mb-3">
 
-        <div className="col-md-3">
+            <div className="col-md-8">
 
-          <div className="card shadow text-center p-3">
+              <input
 
-            <h6>Total Appointments</h6>
+                type="text"
 
-            <h2>{appointments.length}</h2>
+                className="form-control"
 
-          </div>
+                placeholder="Search Patient or Doctor"
 
-        </div>
+                value={search}
 
-        <div className="col-md-3">
+                onChange={(e)=>setSearch(
 
-          <div className="card shadow text-center p-3">
+                  e.target.value
 
-            <h6>Waiting</h6>
+                )}
 
-            <h2 className="text-warning">
-              {waiting}
-            </h2>
+              />
 
-          </div>
+            </div>
 
-        </div>
+            <div className="col-md-4">
 
-        <div className="col-md-3">
+              <select
 
-          <div className="card shadow text-center p-3">
+                className="form-select"
 
-            <h6>In Progress</h6>
+                value={statusFilter}
 
-            <h2 className="text-primary">
-              {inProgress}
-            </h2>
+                onChange={(e)=>setStatusFilter(
 
-          </div>
+                  e.target.value
 
-        </div>
+                )}
 
-        <div className="col-md-3">
+              >
 
-          <div className="card shadow text-center p-3">
+                <option value="All">
 
-            <h6>Completed</h6>
+                  All Status
 
-            <h2 className="text-success">
-              {completed}
-            </h2>
+                </option>
 
-          </div>
+                <option value="Waiting">
 
-        </div>
+                  Waiting
 
-      </div>
+                </option>
 
-      {/* Search & Filter */}
+                <option value="In Progress">
 
-      <div className="card shadow p-4">
+                  In Progress
 
-        <div className="row mb-3">
+                </option>
 
-          <div className="col-md-4">
+                <option value="Completed">
 
-            <input
-              type="text"
-              className="form-control"
-              placeholder="🔍 Search Patient..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+                  Completed
 
-          </div>
+                </option>
 
-          <div className="col-md-3">
+                <option value="Cancelled">
 
-            <select
-              className="form-select"
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value)
-              }
-            >
+                  Cancelled
 
-              <option value="All">
-                All
-              </option>
+                </option>
 
-              <option value="Waiting">
-                Waiting
-              </option>
+              </select>
 
-              <option value="In Progress">
-                In Progress
-              </option>
-
-              <option value="Completed">
-                Completed
-              </option>
-
-            </select>
+            </div>
 
           </div>
 
-          <div className="col-md-2">
+          <div className="table-responsive">
 
-            <button
-              className="btn btn-success w-100"
-              onClick={fetchAppointments}
-            >
-              🔄 Refresh
-            </button>
+            <table className="table table-hover align-middle">
 
-          </div>
+              <thead className="table-dark">
 
-        </div>
+                <tr>
 
-        {/* Appointment Table */}
+                  <th>Token</th>
 
-        <table className="table table-hover table-bordered text-center align-middle">
+                  <th>Patient</th>
 
-          <thead className="table-dark">
+                  <th>Doctor</th>
 
-            <tr>
+                  <th>Date</th>
 
-              <th>Token</th>
+                  <th>Time Slot</th>
 
-              <th>Patient</th>
+                  <th>Status</th>
 
-              <th>Doctor</th>
+                  <th>Action</th>
 
-              <th>Date</th>
+                </tr>
 
-              <th>Status</th>
+              </thead>
 
-              <th>Action</th>
+              <tbody>
 
-            </tr>
+                {
 
-          </thead>
+                  filteredAppointments.length > 0
 
-          <tbody>
+                  ?
 
-            {
+                  filteredAppointments.map((appointment)=>(
 
-              filteredAppointments.length > 0 ? (
+                    <tr key={appointment._id}>
 
-                filteredAppointments.map((appointment) => (
+                      <td>
 
-                  <tr key={appointment._id}>
+                        <span className="badge bg-primary">
 
-                    <td>{appointment.token}</td>
+                          #{appointment.token}
 
-                    <td>{appointment.patient?.name}</td>
+                        </span>
 
-                    <td>{appointment.doctor}</td>
+                      </td>
 
-                    <td>{appointment.date}</td>
+                      <td>
 
-                    <td>
+                        <div>
 
-                      <span
-                        className={`badge rounded-pill px-3 py-2 ${
-                          appointment.status === "Waiting"
-                            ? "bg-warning text-dark"
-                            : appointment.status === "In Progress"
-                            ? "bg-primary"
-                            : appointment.status === "Completed"
-                            ? "bg-success"
-                            : "bg-secondary"
-                        }`}
-                      >
+                          <h6 className="mb-0">
 
-                        {appointment.status}
+                            {appointment.patient?.name}
 
-                      </span>
+                          </h6>
 
-                    </td>
+                          <small className="text-muted">
 
-                    <td>
+                            {appointment.patient?.email}
 
-                      <select
-                        className="form-select"
-                        value={appointment.status}
-                        onChange={(e) =>
-                          updateStatus(
-                            appointment._id,
-                            e.target.value
-                          )
-                        }
-                      >
+                          </small>
 
-                        <option value="Waiting">
-                          Waiting
-                        </option>
+                        </div>
 
-                        <option value="In Progress">
-                          In Progress
-                        </option>
+                      </td>
 
-                        <option value="Completed">
-                          Completed
-                        </option>
+                      <td>
 
-                      </select>
+                        👨‍⚕️ {appointment.doctor}
+
+                      </td>
+
+                      <td>
+
+                        {appointment.date}
+
+                      </td>
+
+                      <td>
+
+                        🕒 {appointment.slot}
+
+                      </td>
+
+                      <td>
+
+                        <span
+
+                          className={`badge px-3 py-2
+
+                          ${
+
+                            appointment.status==="Waiting"
+
+                            ?
+
+                            "bg-warning text-dark"
+
+                            :
+
+                            appointment.status==="In Progress"
+
+                            ?
+
+                            "bg-primary"
+
+                            :
+
+                            appointment.status==="Completed"
+
+                            ?
+
+                            "bg-success"
+
+                            :
+
+                            "bg-danger"
+
+                          }
+
+                          `}
+
+                        >
+
+                          {appointment.status}
+
+                        </span>
+
+                      </td>
+
+                      <td>
+                                              {
+
+                        appointment.status === "Waiting" && (
+
+                          <button
+
+                            className="btn btn-primary btn-sm me-2"
+
+                            onClick={()=>updateStatus(
+
+                              appointment._id,
+
+                              "In Progress"
+
+                            )}
+
+                          >
+
+                            ▶️ Start
+
+                          </button>
+
+                        )
+
+                      }
+
+                      {
+
+                        appointment.status === "In Progress" && (
+
+                          <button
+
+                            className="btn btn-success btn-sm me-2"
+
+                            onClick={()=>updateStatus(
+
+                              appointment._id,
+
+                              "Completed"
+
+                            )}
+
+                          >
+
+                            ✅ Complete
+
+                          </button>
+
+                        )
+
+                      }
+
+                      {
+
+                        appointment.status !== "Completed" &&
+
+                        appointment.status !== "Cancelled" && (
+
+                          <button
+
+                            className="btn btn-danger btn-sm"
+
+                            onClick={()=>updateStatus(
+
+                              appointment._id,
+
+                              "Cancelled"
+
+                            )}
+
+                          >
+
+                            ❌ Cancel
+
+                          </button>
+
+                        )
+
+                      }
 
                     </td>
 
@@ -360,13 +450,16 @@ function ReceptionistDashboard() {
 
                 ))
 
-              ) : (
+                :
 
                 <tr>
 
                   <td
-                    colSpan="6"
-                    className="text-center"
+
+                    colSpan="7"
+
+                    className="text-center text-muted py-4"
+
                   >
 
                     No Appointments Found
@@ -375,13 +468,14 @@ function ReceptionistDashboard() {
 
                 </tr>
 
-              )
+              }
+                            </tbody>
 
-            }
+            </table>
 
-          </tbody>
+          </div>
 
-        </table>
+        </div>
 
       </div>
 
