@@ -29,10 +29,41 @@ const server = http.createServer(app);
 
 const allowedOrigins = [
     "https://smart-queue-system-eta.vercel.app",
+    "https://smart-queue-system-jut7429tp-kashika-suris-projects.vercel.app",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:5175"
 ];
+
+// ======================
+// CORS Origin Checker
+// ======================
+
+const corsOrigin = function (origin, callback) {
+
+    // Allow requests without origin
+    // Example: Postman / server-to-server
+    if (!origin) {
+        return callback(null, true);
+    }
+
+    // Allow exact origins
+    if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+    }
+
+    // Allow Vercel preview deployments
+    if (
+        origin.startsWith("https://smart-queue-system-") &&
+        origin.endsWith("-kashika-suris-projects.vercel.app")
+    ) {
+        return callback(null, true);
+    }
+
+    console.log("❌ Blocked by CORS:", origin);
+
+    return callback(new Error("Not allowed by CORS"));
+};
 
 // ======================
 // Middleware
@@ -40,24 +71,7 @@ const allowedOrigins = [
 
 app.use(
     cors({
-        origin: function (origin, callback) {
-
-            // Allow requests without origin
-            // such as Postman or server-to-server requests
-            if (!origin) {
-                return callback(null, true);
-            }
-
-            if (allowedOrigins.includes(origin)) {
-                return callback(null, true);
-            }
-
-            console.log("❌ Blocked by CORS:", origin);
-
-            return callback(
-                new Error("Not allowed by CORS")
-            );
-        },
+        origin: corsOrigin,
 
         methods: [
             "GET",
@@ -80,13 +94,11 @@ app.use(express.json());
 
 const io = new Server(server, {
     cors: {
-        origin: allowedOrigins,
+        origin: corsOrigin,
 
         methods: [
             "GET",
-            "POST",
-            "PUT",
-            "DELETE"
+            "POST"
         ],
 
         credentials: true
@@ -122,11 +134,9 @@ app.use(
 app.get(
     "/",
     (req, res) => {
-
         res.send(
             "Smart Queue Backend Running 🚀"
         );
-
     }
 );
 
@@ -136,22 +146,16 @@ app.get(
 
 mongoose
     .connect(process.env.MONGO_URI)
-
     .then(() => {
-
         console.log(
             "✅ MongoDB Connected"
         );
-
     })
-
     .catch((err) => {
-
         console.log(
             "❌ MongoDB Error:",
             err.message
         );
-
     });
 
 // ======================
@@ -180,7 +184,6 @@ io.on(
                 console.log(
                     `👤 Patient Joined Room: ${patientId}`
                 );
-
             }
         );
 
@@ -197,7 +200,6 @@ io.on(
                 console.log(
                     `👨‍⚕️ Doctor Joined Room: ${doctorName}`
                 );
-
             }
         );
 
@@ -213,10 +215,8 @@ io.on(
                     "🔴 Socket Disconnected:",
                     socket.id
                 );
-
             }
         );
-
     }
 );
 
@@ -233,6 +233,5 @@ server.listen(
         console.log(
             `🚀 Server running on port ${PORT}`
         );
-
     }
 );
