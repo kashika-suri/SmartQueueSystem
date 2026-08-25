@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://smartqueuesystem-production.up.railway.app/api",
+  baseURL: "https://smartqueuesystem-219o.onrender.com/api",
 });
 
 API.interceptors.request.use(
