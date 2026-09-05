@@ -1,4 +1,5 @@
 const Appointment = require("../models/Appointment");
+const { getRecommendation } = require("../services/slotRecommendationService");
 
 // ======================
 // Book Appointment
@@ -155,6 +156,32 @@ const bookAppointment = async (req, res) => {
   }
 
 };
+
+// ======================
+// AI Slot Recommendation
+// ======================
+
+const recommendSlot = async (req, res) => {
+  try {
+    const { doctor, date } = req.query;
+
+    if (!doctor || !date) {
+      return res.status(400).json({
+        message: "Doctor and date are required"
+      });
+    }
+
+    const recommendation = await getRecommendation(doctor, date);
+
+    res.json(recommendation);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      message: err.message
+    });
+  }
+};
+
 // ======================
 // Get All Appointments
 // ======================
@@ -704,6 +731,8 @@ module.exports = {
 
   getDoctorAppointments,
 
-  updateAppointmentStatus
+  updateAppointmentStatus,
+
+  recommendSlot
 
 };

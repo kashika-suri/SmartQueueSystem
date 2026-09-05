@@ -1,9 +1,10 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://smartqueuesystem-219o.onrender.com/api",
+  baseURL: "http://localhost:5000/api",
 });
 
+// Add JWT token to every request
 API.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
